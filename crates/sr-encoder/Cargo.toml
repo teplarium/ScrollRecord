@@ -1,0 +1,17 @@
+[package]
+name = "sr-encoder"
+description = "ScrollRecord encoder: turns captured frames into MP4/WebM via ffmpeg, or a PNG folder."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sr-core.workspace = true
+sr-capture.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -8,6 +8,9 @@ node_modules/
 # Tauri-generated permission schemas (recreated on every build)
 /apps/desktop/src-tauri/gen/
 
+# Render output
+renders/
+
 # Logs and local scratch
 *.log
 .DS_Store

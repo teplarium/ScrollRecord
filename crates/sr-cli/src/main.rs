@@ -1,20 +1,21 @@
 //! # sr-cli — the `scrollrecord` command
 //!
 //! Purpose: headless access to everything the desktop app can do
-//!          (HANDOFF NFR-09). Phase 0 ships `info` and `errors`; Phase 1 adds
-//!          `render`, `validate`, `digest`; Phase 5 adds `export-skills`.
+//!          (HANDOFF NFR-09): `render`, `validate`, `info`, `errors`.
+//!          Later phases add `digest` and `export-skills`.
 //! Solves:  bugs can be reproduced and fixes verified without the UI — by a
 //!          developer, by CI, or by an AI assistant running a command.
-//! Rules:   no business logic here. Each subcommand parses arguments, calls a
-//!          library crate and prints the result (human text or `--json`).
+//! Rules:   no business logic here. Each subcommand (one file in `commands/`)
+//!          parses arguments, calls a library crate and prints the result.
+
+mod commands;
 
 use std::path::PathBuf;
+use std::process::ExitCode;
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
-use sr_core::ErrorCode;
+use sr_core::AppError;
 use sr_diagnostics::{LogOptions, init_logging};
-use sr_ipc::AppInfo;
 
 // ── Command-line definition ─────────────────────────────────────────────────
 // Why: clap derives parsing, `--help` text and validation from these structs,
@@ -38,6 +39,10 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Render videos from a scenario file (*.srflow.json).
+    Render(commands::render::RenderArgs),
+    /// Check a scenario file without rendering.
+    Validate(commands::validate::ValidateArgs),
     /// Print versions and environment (paste this into bug reports).
     Info {
         /// Print machine-readable JSON instead of text.
@@ -52,57 +57,48 @@ enum Command {
     },
 }
 
-fn main() -> Result<()> {
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
     // Keep the guard alive until main returns so file logs are flushed.
-    let _log_guard = init_logging(LogOptions {
+    let _log_guard = match init_logging(LogOptions {
         log_dir: cli.log_dir.clone(),
         default_level: Some(if cli.verbose { "debug" } else { "warn" }.to_owned()),
-    })?;
+    }) {
+        Ok(guard) => Some(guard),
+        Err(err) => {
+            report(&err);
+            None
+        }
+    };
 
-    match cli.command {
-        Command::Info { json } => print_info(json, cli.log_dir),
-        Command::Errors { json } => print_errors(json),
+    let result = match cli.command {
+        Command::Render(args) => commands::render::run(args),
+        Command::Validate(args) => commands::validate::run(&args),
+        Command::Info { json } => commands::info::run(json, cli.log_dir),
+        Command::Errors { json } => commands::info::errors(json),
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            report(&err);
+            ExitCode::FAILURE
+        }
     }
 }
 
-// ── Subcommand handlers ─────────────────────────────────────────────────────
-
-/// `scrollrecord info` — same data the desktop app shows in its footer.
-fn print_info(json: bool, log_dir: Option<PathBuf>) -> Result<()> {
-    let info = AppInfo::current(
-        env!("CARGO_PKG_VERSION"),
-        log_dir.map(|dir| dir.display().to_string()),
+// ── Error output ────────────────────────────────────────────────────────────
+// Why: every failure shows its SR code and where to read about it, so a user
+//      can fix it or paste it into an issue (HANDOFF §12).
+fn report(err: &AppError) {
+    eprintln!("error[{}]: {}", err.code, err.code.summary());
+    for line in err.message.lines() {
+        eprintln!("  {line}");
+    }
+    eprintln!(
+        "  → https://github.com/teplarium/ScrollRecord/blob/main/docs/ERRORS.md#{}",
+        err.code.as_str().to_ascii_lowercase()
     );
-    if json {
-        println!("{}", serde_json::to_string_pretty(&info)?);
-    } else {
-        println!("{} {}", info.app_name, info.app_version);
-        println!("core     {}", info.core_version);
-        println!("platform {}-{}", info.os, info.arch);
-        if let Some(dir) = &info.log_dir {
-            println!("logs     {dir}");
-        }
-    }
-    Ok(())
-}
-
-/// `scrollrecord errors` — the catalog from `sr-core` (details: docs/ERRORS.md).
-fn print_errors(json: bool) -> Result<()> {
-    if json {
-        let list: Vec<_> = ErrorCode::ALL
-            .iter()
-            .map(|c| serde_json::json!({ "code": c.as_str(), "summary": c.summary() }))
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&list)?);
-    } else {
-        for code in ErrorCode::ALL {
-            println!("{}  {}", code.as_str(), code.summary());
-        }
-        println!("\nDetails and fixes: docs/ERRORS.md");
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -120,5 +116,22 @@ mod tests {
         let cli = Cli::try_parse_from(["scrollrecord", "-v", "errors", "--json"]).unwrap();
         assert!(cli.verbose);
         assert!(matches!(cli.command, Command::Errors { json: true }));
+
+        let cli = Cli::try_parse_from([
+            "scrollrecord",
+            "render",
+            "a.srflow.json",
+            "-t",
+            "mobile",
+            "-t",
+            "desktop",
+            "--best",
+        ])
+        .unwrap();
+        let Command::Render(args) = cli.command else {
+            panic!("render expected")
+        };
+        assert_eq!(args.target, ["mobile", "desktop"]);
+        assert!(args.best);
     }
 }

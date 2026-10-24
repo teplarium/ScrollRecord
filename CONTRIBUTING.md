@@ -34,9 +34,12 @@ pnpm dev                 # desktop app with hot reload
 | `cargo test --workspace` | Rust tests. **Also regenerates TypeScript bindings**, so commit them if they change |
 | `cargo clippy --workspace --all-targets -- -D warnings` | Rust lints |
 | `cargo fmt --all` | Auto-format Rust code |
-| `cargo run -p sr-cli -- info` | The `scrollrecord` CLI |
+| `cargo run -p sr-cli -- info` | The `scrollrecord` CLI: shows the browser and ffmpeg it found |
+| `cargo run --release -p sr-cli -- render examples/01-plain-landing.srflow.json` | Render the example videos (needs Chrome/Edge/Chromium + ffmpeg) |
 
-Set `SR_LOG=debug` to get verbose logs.
+Set `SR_LOG=debug` to get verbose logs. `SR_BROWSER` and `SR_FFMPEG` point to a specific browser or ffmpeg.
+
+Rendering tests (`sr-browser`, `sr-render`) run only when a Chromium-based browser is installed; otherwise they print "skipped" and pass.
 
 ## 3. Pull requests
 

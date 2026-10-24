@@ -1,0 +1,20 @@
+[package]
+name = "sr-browser"
+description = "ScrollRecord browser driver: finds and controls Chrome/Edge/Chromium via the DevTools protocol."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sr-core.workspace = true
+base64.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tungstenite.workspace = true
+
+[lints]
+workspace = true

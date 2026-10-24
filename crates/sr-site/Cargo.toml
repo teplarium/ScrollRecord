@@ -1,0 +1,18 @@
+[package]
+name = "sr-site"
+description = "ScrollRecord site sources: local folders (served by a built-in web server) and URLs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sr-core.workspace = true
+percent-encoding.workspace = true
+tiny_http.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -32,6 +32,25 @@
     "SR-0001": "Something unexpected went wrong inside ScrollRecord. This is a bug — please report it and mention {{code}}.",
     "SR-0002": "This feature isn't built yet. It's planned for roadmap phase {{phase}}.",
     "SR-0003": "The ScrollRecord core isn't reachable. Open this interface inside the desktop app.",
-    "SR-0101": "Log files couldn't be created. The app still works, but problem reports will contain less detail."
+    "SR-0101": "Log files couldn't be created. The app still works, but problem reports will contain less detail.",
+    "SR-1001": "A file couldn't be read. Check the path and that no other program has it locked.",
+    "SR-1002": "A file couldn't be saved. Check free disk space, and close any player that still has the old video open.",
+    "SR-2001": "The scenario file has a mistake on line {{line}}, column {{column}}.",
+    "SR-2002": "The scenario doesn't fit together: {{first}}",
+    "SR-2003": "This scenario needs a newer version of ScrollRecord (format {{version}}, this version reads {{supported}}).",
+    "SR-2004": "There is no render target called “{{target}}”. Available: {{available}}.",
+    "SR-2101": "The block “{{block}}” wasn't found on the page.",
+    "SR-2102": "The block “{{block}}” matches several elements. Make its locator more specific or add a data-sr attribute.",
+    "SR-3001": "No Chrome, Edge or Chromium browser was found. Install one, or choose its location in Settings.",
+    "SR-3002": "The browser didn't start. Please try again.",
+    "SR-3003": "Lost contact with the browser while recording.",
+    "SR-3004": "The page {{url}} didn't load.",
+    "SR-3005": "A helper script inside the page failed.",
+    "SR-4001": "A video frame couldn't be captured. Try a lower resolution.",
+    "SR-5001": "ffmpeg wasn't found. It's needed for MP4 and WebM videos; PNG frames work without it.",
+    "SR-5002": "The video couldn't be encoded.",
+    "SR-8001": "No site was chosen. Pick a site folder or a localhost address.",
+    "SR-8002": "The site folder wasn't found, or it has no index.html.",
+    "SR-8003": "The built-in local web server couldn't start."
   }
 }

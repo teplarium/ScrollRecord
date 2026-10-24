@@ -29,19 +29,28 @@ authors = ["ScrollRecord contributors"]
 sr-core = { path = "crates/sr-core" }
 sr-ipc = { path = "crates/sr-ipc" }
 sr-diagnostics = { path = "crates/sr-diagnostics" }
+sr-site = { path = "crates/sr-site" }
+sr-browser = { path = "crates/sr-browser" }
+sr-timeline = { path = "crates/sr-timeline" }
+sr-capture = { path = "crates/sr-capture" }
+sr-encoder = { path = "crates/sr-encoder" }
+sr-render = { path = "crates/sr-render" }
 
 # External crates
-anyhow = "1"
+base64 = "0.23"
 clap = { version = "4", features = ["derive"] }
+percent-encoding = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
+tiny_http = "0.12"
 thiserror = "2"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 ts-rs = "12"
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 
 # Shared lints — the safety net for a project maintained mostly through AI and
 # community contributions (HANDOFF NFR-06, NFR-12).

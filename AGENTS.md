@@ -47,6 +47,8 @@ cargo test --workspace          # also regenerates TS bindings: commit them if t
 pnpm check                      # lint + format check + typecheck + UI tests
 ```
 
+Rendering tests need Chrome, Edge or Chromium (set `SR_BROWSER=<path>` if it isn't found automatically). Without one they print "skipped" and pass, so say so in your report: skipped is not tested.
+
 Then report in plain language: what changed, what was tested, what is still missing.
 
 ## 5. Working from a bug report

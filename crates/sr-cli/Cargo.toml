@@ -16,10 +16,12 @@ path = "src/main.rs"
 sr-core.workspace = true
 sr-ipc.workspace = true
 sr-diagnostics.workspace = true
-anyhow.workspace = true
+sr-browser.workspace = true
+sr-capture.workspace = true
+sr-encoder.workspace = true
+sr-render.workspace = true
 clap.workspace = true
 serde_json.workspace = true
-tracing.workspace = true
 
 [lints]
 workspace = true

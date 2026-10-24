@@ -1,0 +1,46 @@
+{
+  "format_version": 1,
+  "meta": {
+    "name": "Fixture 01 — plain landing",
+    "site": "../tests/fixtures/sites/01-plain-landing"
+  },
+  "targets": [
+    { "id": "desktop", "viewport": "desktop-1920", "aspect": "16:9", "resolution": "1080p", "fps": 60 },
+    { "id": "mobile", "viewport": "iphone-15", "aspect": "9:16", "resolution": "1080p", "fps": 60 }
+  ],
+  "defaults": {
+    "scroll": { "speed_px_s": 1000, "easing": "ease-in-out" },
+    "hold_ms": 1200
+  },
+  "pages": [{ "id": "home", "url": "/" }],
+  "nodes": [
+    { "id": "start", "kind": "start", "at": { "block": "hero", "anchor": "top" } },
+    { "id": "hero", "kind": "block", "page": "home", "target": [{ "sr": "hero" }], "hold_ms": 1500 },
+    { "id": "features", "kind": "block", "page": "home", "target": [{ "sr": "features" }], "hold_ms": 0 },
+    { "id": "steps", "kind": "block", "page": "home", "target": [{ "sr": "steps" }], "hold_ms": 1200 },
+    { "id": "quote", "kind": "block", "page": "home", "target": [{ "sr": "quote" }], "align": "center", "hold_ms": 0 },
+    {
+      "id": "pricing",
+      "kind": "block",
+      "page": "home",
+      "target": [{ "sr": "pricing" }, { "css": "#pricing" }],
+      "align": "center",
+      "hold_ms": 1500
+    },
+    { "id": "footer", "kind": "block", "page": "home", "target": [{ "sr": "footer" }] },
+    { "id": "end", "kind": "end", "at": { "block": "footer", "anchor": "bottom" }, "hold_ms": 800 }
+  ],
+  "edges": [
+    { "from": "start", "to": "hero" },
+    { "from": "hero", "to": "features" },
+    { "from": "features", "to": "steps" },
+    { "from": "steps", "to": "quote" },
+    { "from": "quote", "to": "pricing" },
+    { "from": "pricing", "to": "end", "scroll": { "duration_ms": 1200 } }
+  ],
+  "overrides": {
+    "iphone-15": {
+      "nodes": { "pricing": { "align": "top", "hold_ms": 2000 } }
+    }
+  }
+}

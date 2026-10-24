@@ -58,6 +58,20 @@ h1, h2, h3, p { margin: 0; }
 .reveal:nth-child(3) { transition-delay: 200ms; }
 .reveal:nth-child(4) { transition-delay: 300ms; }
 
+/* How it works — numbered steps, also revealed on scroll */
+.steps { padding: 120px 40px; max-width: 1100px; margin: 0 auto; }
+.steps h2 { font-size: 44px; margin-bottom: 40px; letter-spacing: -0.02em; }
+.steps__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.step { padding: 32px; border-radius: 20px; background: #15171c; color: #fbfaf7; }
+.step__num { display: inline-grid; place-items: center; width: 40px; height: 40px; margin-bottom: 20px; border-radius: 50%; background: #ff5e3a; font-weight: 800; }
+.step h3 { font-size: 24px; margin-bottom: 8px; }
+.step p { color: #c9c6bf; }
+
+/* Quote — large text block */
+.quote { padding: 140px 40px; text-align: center; background: #f1ede4; }
+.quote blockquote { max-width: 22ch; margin: 0 auto 24px; font-size: clamp(32px, 4.5vw, 56px); line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; }
+.quote__author { color: #50545c; }
+
 /* Pricing — card hover lift */
 .pricing__plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 .plan {
@@ -81,5 +95,6 @@ h1, h2, h3, p { margin: 0; }
   .nav a { padding: 16px 20px; border-top: 1px solid #e6e3dc; }
   .nav.is-open { display: flex; }
   .features, .pricing { padding: 80px 20px; }
-  .features__grid, .pricing__plans { grid-template-columns: 1fr; }
+  .features__grid, .pricing__plans, .steps__list { grid-template-columns: 1fr; }
+  .steps, .quote { padding: 80px 20px; }
 }

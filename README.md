@@ -4,7 +4,19 @@
 
 ScrollRecord is a free, open-source desktop app that renders frame-perfect scroll videos of websites for any device, with a visual cursor that shows hovers and clicks. You plan the video on a FigJam-like canvas: blocks of the page as cards, arrows for the order, start and end points. It can also record a single block's animation, cropped to that block, even with a transparent background. Scenarios are plain JSON, so AI models can write them for you using the skill you download from the app.
 
-> **Status: Phase 0 — foundation.** The app starts and its architecture is in place, but it doesn't record anything yet. Recording arrives in Phase 1. See the [roadmap](HANDOFF.md#14-дорожная-карта).
+> **Status: Phase 1 — command-line rendering works.** `scrollrecord render` produces smooth, reproducible videos. The desktop editor arrives in Phase 3 and the cursor in Phase 2. See the [roadmap](HANDOFF.md#14-дорожная-карта).
+
+## Try it (command line)
+
+You need Chrome, Edge or Chromium, plus [ffmpeg](https://ffmpeg.org/download.html) for MP4/WebM. PNG frames work without ffmpeg.
+
+```sh
+cargo run --release -p sr-cli -- validate examples/01-plain-landing.srflow.json
+cargo run --release -p sr-cli -- render   examples/01-plain-landing.srflow.json
+# → examples/renders/01-plain-landing_desktop.mp4 and …_mobile.mp4
+```
+
+Your own site: copy the example, set `"site"` to your site folder (or `http://localhost:…`), and list the blocks to show, ideally marked in your HTML with `data-sr="name"`.
 
 ## Planned features
 

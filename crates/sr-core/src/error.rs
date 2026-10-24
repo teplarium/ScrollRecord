@@ -71,6 +71,56 @@ error_codes! {
     DesktopShellUnavailable = "SR-0003", "UI is not running inside the desktop app";
     /// The log folder or log file could not be created.
     LoggingInitFailed = "SR-0101", "Could not initialise logging";
+
+    // ── Files ──
+    /// A file (e.g. a scenario) could not be read.
+    FileReadFailed = "SR-1001", "Could not read a file";
+    /// A file or folder (e.g. the output video) could not be written.
+    FileWriteFailed = "SR-1002", "Could not write a file";
+
+    // ── Flow format & validation ──
+    /// The scenario file is not valid JSON or does not match the format.
+    FlowParseFailed = "SR-2001", "Scenario file could not be parsed";
+    /// The scenario parses but is inconsistent (missing start, broken arrows…).
+    FlowInvalid = "SR-2002", "Scenario is not valid";
+    /// The scenario was written for a newer format version.
+    FlowVersionUnsupported = "SR-2003", "Scenario format version is not supported";
+    /// The requested render target id does not exist in the scenario.
+    TargetNotFound = "SR-2004", "Render target not found in scenario";
+    /// No element on the page matches a block's locators.
+    LocatorNotFound = "SR-2101", "Block element not found on the page";
+    /// A locator matches several elements, so the block is ambiguous.
+    LocatorAmbiguous = "SR-2102", "Block locator matches several elements";
+
+    // ── Browser ──
+    /// No Chrome, Edge or Chromium installation was found.
+    BrowserNotFound = "SR-3001", "No Chromium-based browser found";
+    /// The browser was found but did not start or did not open its debug port.
+    BrowserLaunchFailed = "SR-3002", "Browser failed to start";
+    /// The browser returned an error or stopped answering.
+    BrowserProtocolError = "SR-3003", "Browser communication failed";
+    /// The page did not load (bad URL, server down, timeout).
+    PageLoadFailed = "SR-3004", "Page failed to load";
+    /// A script run inside the page failed.
+    PageScriptFailed = "SR-3005", "Script inside the page failed";
+
+    // ── Capture ──
+    /// A video frame could not be captured.
+    CaptureFailed = "SR-4001", "Frame capture failed";
+
+    // ── Encoder ──
+    /// ffmpeg is needed for this output format but was not found.
+    FfmpegNotFound = "SR-5001", "ffmpeg not found";
+    /// ffmpeg failed while encoding the video.
+    EncoderFailed = "SR-5002", "Video encoding failed";
+
+    // ── Site sources ──
+    /// Neither the scenario nor the command line says which site to record.
+    SiteNotSpecified = "SR-8001", "No site specified";
+    /// The site folder does not exist or has no index.html.
+    SiteFolderInvalid = "SR-8002", "Site folder not found or has no index.html";
+    /// The built-in local web server could not start.
+    SiteServerFailed = "SR-8003", "Local site server failed";
 }
 
 impl fmt::Display for ErrorCode {

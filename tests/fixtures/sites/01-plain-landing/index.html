@@ -3,7 +3,8 @@
   Fixture 01 — plain landing page.
   Purpose: the baseline capture test with the owner's typical stack (no framework).
   Covers: data-sr block markers, a looping CSS animation (hero), scroll-reveal
-  (features), hover states (pricing), sticky header, burger menu below 760px.
+  (features, steps, quote), hover states (pricing), sticky header, burger menu
+  below 760px. Long enough (~4000px on desktop) for real scroll moves.
 -->
 <html lang="en">
   <head>
@@ -40,7 +41,23 @@
           <article class="feature reveal"><h3>Offline</h3><p>Works without a connection.</p></article>
           <article class="feature reveal"><h3>Private</h3><p>Your data stays on your device.</p></article>
           <article class="feature reveal"><h3>Shared</h3><p>Invite your team in one click.</p></article>
+          <article class="feature reveal"><h3>Searchable</h3><p>Find anything in milliseconds.</p></article>
+          <article class="feature reveal"><h3>Open</h3><p>Plain files, no lock-in.</p></article>
         </div>
+      </section>
+
+      <section class="steps" id="how" data-sr="steps">
+        <h2>How it works</h2>
+        <ol class="steps__list">
+          <li class="step reveal"><span class="step__num">1</span><h3>Capture</h3><p>Drop thoughts in as they come.</p></li>
+          <li class="step reveal"><span class="step__num">2</span><h3>Shape</h3><p>Turn notes into plans with one drag.</p></li>
+          <li class="step reveal"><span class="step__num">3</span><h3>Ship</h3><p>Share a clean page with your team.</p></li>
+        </ol>
+      </section>
+
+      <section class="quote" data-sr="quote">
+        <blockquote class="reveal">“Lumen replaced three tools for us. The team actually enjoys planning now.”</blockquote>
+        <p class="quote__author">— Mira, product lead</p>
       </section>
 
       <section class="pricing" id="pricing" data-sr="pricing">
