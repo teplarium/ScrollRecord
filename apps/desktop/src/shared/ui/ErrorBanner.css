@@ -1,0 +1,34 @@
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  font-size: var(--text-sm);
+}
+
+.error-banner__code {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--warning);
+}
+
+.error-banner__text {
+  flex: 1;
+}
+
+.error-banner__dismiss {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.error-banner__dismiss:hover {
+  background: var(--surface-raised);
+}

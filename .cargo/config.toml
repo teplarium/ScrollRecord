@@ -1,0 +1,6 @@
+# Where `ts-rs` writes TypeScript bindings when `cargo test` runs.
+# Why: Rust types are the single source of truth (HANDOFF D-10, D-17); the UI
+# imports the generated files, so a Rust change that breaks the UI fails at
+# compile time instead of at runtime. Path is relative to the repository root.
+[env]
+TS_RS_EXPORT_DIR = { value = "apps/desktop/src/shared/ipc/generated", relative = true }

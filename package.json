@@ -1,0 +1,22 @@
+{
+  "name": "scrollrecord-workspace",
+  "private": true,
+  "description": "JS workspace root. Scripts here are shortcuts so every common task runs from the repository root.",
+  "license": "MIT OR Apache-2.0",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @scrollrecord/desktop tauri dev",
+    "build": "pnpm --filter @scrollrecord/desktop tauri build",
+    "dev:ui": "pnpm --filter @scrollrecord/desktop dev",
+    "build:ui": "pnpm --filter @scrollrecord/desktop build",
+    "lint": "pnpm --filter @scrollrecord/desktop lint",
+    "typecheck": "pnpm --filter @scrollrecord/desktop typecheck",
+    "test": "pnpm --filter @scrollrecord/desktop test",
+    "format": "pnpm --filter @scrollrecord/desktop format",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
+    "format:check": "pnpm --filter @scrollrecord/desktop format:check"
+  }
+}

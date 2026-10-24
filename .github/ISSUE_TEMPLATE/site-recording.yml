@@ -1,0 +1,50 @@
+name: A site doesn't record correctly
+description: The video stutters, misses an animation, picks the wrong block, the cursor is off…
+labels: [recording]
+body:
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What's wrong?
+      multiple: true
+      options:
+        - Video stutters / jumps
+        - An animation is missing or plays wrong
+        - Wrong block, or block not found
+        - Cursor is in the wrong place / wrong look
+        - Page looks different from the browser
+        - Navigation to another page fails
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: site
+    attributes:
+      label: Site
+      description: A public URL, or "local folder". Attach a zip of the site if you can share it.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device / target
+      placeholder: e.g. iPhone 15, 9:16, 1080p
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What should happen vs. what happens? Which block? Screenshots or a short clip help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: flow
+    attributes:
+      label: Scenario file (optional)
+      description: Attach or paste your `.srflow.json`.
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: Bottom line of the app window, or `scrollrecord info`.
+    validations:
+      required: true

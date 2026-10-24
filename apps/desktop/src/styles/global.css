@@ -1,0 +1,94 @@
+/* Design tokens + base element styles.
+   Why tokens: every colour and size is named once here, so a theme change or
+   a future "light/dark" switch touches one file only. Dark is the default
+   (video tools are used next to footage); light follows the OS setting. */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0d0e11;
+  --surface: #15171b;
+  --surface-raised: #1c1f25;
+  --border: #262a31;
+  --border-strong: #353a43;
+  --text: #e9ebee;
+  --text-muted: #9097a1;
+  --accent: #ff4d3d; /* "REC" red */
+  --accent-soft: rgb(255 77 61 / 18%);
+  --accent-text: #ffffff;
+  --warning: #f5b84a;
+  --focus: #7cb7ff;
+
+  --font-sans:
+    "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Ubuntu", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "Consolas", "Ubuntu Mono", monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 30px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 56px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f6f6f4;
+    --surface: #ffffff;
+    --surface-raised: #fbfbfa;
+    --border: #e2e2de;
+    --border-strong: #cfcfca;
+    --text: #17181b;
+    --text-muted: #62666d;
+    --accent: #e8382a;
+    --accent-soft: rgb(232 56 42 / 14%);
+    --warning: #9a6200;
+    --focus: #2f6fdb;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}

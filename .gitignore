@@ -1,0 +1,19 @@
+# Rust build output
+/target/
+
+# Node / frontend build output
+node_modules/
+/apps/desktop/dist/
+
+# Tauri-generated permission schemas (recreated on every build)
+/apps/desktop/src-tauri/gen/
+
+# Logs and local scratch
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.idea/
+.vscode/*
+!.vscode/extensions.json

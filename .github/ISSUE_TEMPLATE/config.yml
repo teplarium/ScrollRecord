@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: What does my error code mean?
+    url: https://github.com/teplarium/ScrollRecord/blob/main/docs/ERRORS.md
+    about: Every SR-xxxx code is explained here, often with a fix.

@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ScrollRecord — Rust workspace
+#
+# Why: every Rust module lives in its own crate, so it can be built, tested and
+#      fixed in isolation. Dependency direction is strict and documented in
+#      PROJECT_MAP.md ("Dependency rules").
+# Note: new crates are added only when their roadmap phase starts (HANDOFF D-18),
+#       so the workspace never contains empty placeholder crates.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/desktop/src-tauri"]
+
+# Shared package metadata — each crate inherits it with `*.workspace = true`,
+# so the version and license are changed in exactly one place.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/teplarium/ScrollRecord"
+authors = ["ScrollRecord contributors"]
+
+# Shared dependency versions — crates reference them with `{ workspace = true }`
+# so two crates can never silently use two different versions of a library.
+[workspace.dependencies]
+# Internal crates
+sr-core = { path = "crates/sr-core" }
+sr-ipc = { path = "crates/sr-ipc" }
+sr-diagnostics = { path = "crates/sr-diagnostics" }
+
+# External crates
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-build = { version = "2", features = [] }
+thiserror = "2"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+ts-rs = "12"
+
+# Shared lints — the safety net for a project maintained mostly through AI and
+# community contributions (HANDOFF NFR-06, NFR-12).
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# Library code must never crash the app: errors are returned as `AppError`
+# with an `SR-xxxx` code instead (tests are exempt, see clippy.toml).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+dbg_macro = "deny"
+todo = "warn"
+
+# Release builds: smaller binaries, slightly slower compile.
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "symbols"

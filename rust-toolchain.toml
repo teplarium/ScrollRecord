@@ -1,0 +1,7 @@
+# Pins the Rust version for everyone (local machines and CI).
+# Why: a newer compiler can add new lints that would suddenly fail CI; pinning
+# keeps builds reproducible. Bump deliberately in a dedicated PR.
+[toolchain]
+channel = "1.97.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

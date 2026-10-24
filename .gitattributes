@@ -1,0 +1,8 @@
+# Store every text file with LF line endings, also on Windows checkouts.
+# Why: generated TypeScript bindings are compared byte-for-byte in CI; CRLF
+# conversion on Windows would make them look "changed" when they are not.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary

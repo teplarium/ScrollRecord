@@ -1,0 +1,62 @@
+<!doctype html>
+<!--
+  Fixture 01 — plain landing page.
+  Purpose: the baseline capture test with the owner's typical stack (no framework).
+  Covers: data-sr block markers, a looping CSS animation (hero), scroll-reveal
+  (features), hover states (pricing), sticky header, burger menu below 760px.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lumen — fixture landing</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" data-sr="header">
+      <a class="logo" href="#">Lumen</a>
+      <button class="burger" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#contact">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" data-sr="hero">
+        <div class="hero__blob" aria-hidden="true"></div>
+        <h1>Light up your ideas</h1>
+        <p>A calm, fast way to plan, write and ship — built for small teams.</p>
+        <a class="button" href="#pricing">Get started</a>
+      </section>
+
+      <section class="features" id="features" data-sr="features">
+        <h2>Why Lumen</h2>
+        <div class="features__grid">
+          <article class="feature reveal"><h3>Instant</h3><p>Opens in under a second.</p></article>
+          <article class="feature reveal"><h3>Offline</h3><p>Works without a connection.</p></article>
+          <article class="feature reveal"><h3>Private</h3><p>Your data stays on your device.</p></article>
+          <article class="feature reveal"><h3>Shared</h3><p>Invite your team in one click.</p></article>
+        </div>
+      </section>
+
+      <section class="pricing" id="pricing" data-sr="pricing">
+        <h2>Simple pricing</h2>
+        <div class="pricing__plans">
+          <article class="plan"><h3>Free</h3><p class="plan__price">$0</p><a class="button button--ghost" href="#contact">Start</a></article>
+          <article class="plan plan--pro"><h3>Pro</h3><p class="plan__price">$9</p><a class="button" href="#contact">Choose Pro</a></article>
+          <article class="plan"><h3>Team</h3><p class="plan__price">$29</p><a class="button button--ghost" href="#contact">Contact us</a></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact" data-sr="footer">
+      <p>hello@lumen.example · Fixture page for ScrollRecord tests</p>
+    </footer>
+
+    <script src="main.js"></script>
+  </body>
+</html>

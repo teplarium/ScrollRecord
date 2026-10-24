@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "languageName": "English"
+  },
+  "app": {
+    "name": "ScrollRecord",
+    "tagline": "Smooth website scroll videos, from desktop to mobile"
+  },
+  "start": {
+    "badge": "Foundation build · Phase 0",
+    "heading": "Start a recording project",
+    "subheading": "Point ScrollRecord at a website, mark the blocks to show, and render a smooth scroll video for every device.",
+    "newProject": "New project",
+    "newProjectHint": "From a local site folder or a localhost URL",
+    "openProject": "Open project",
+    "openProjectHint": "Continue a project you saved before",
+    "recent": "Recent projects",
+    "recentEmpty": "No projects yet. They will show up here once you create one."
+  },
+  "footer": {
+    "loading": "Connecting to the core…",
+    "version": "v{{version}}",
+    "core": "core {{version}}",
+    "platform": "{{os}} {{arch}}",
+    "language": "Language"
+  },
+  "common": {
+    "dismiss": "Dismiss",
+    "errorCode": "Error {{code}}"
+  },
+  "errors": {
+    "SR-0001": "Something unexpected went wrong inside ScrollRecord. This is a bug — please report it and mention {{code}}.",
+    "SR-0002": "This feature isn't built yet. It's planned for roadmap phase {{phase}}.",
+    "SR-0003": "The ScrollRecord core isn't reachable. Open this interface inside the desktop app.",
+    "SR-0101": "Log files couldn't be created. The app still works, but problem reports will contain less detail."
+  }
+}
