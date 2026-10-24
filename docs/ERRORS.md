@@ -146,7 +146,9 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 
 **ffmpeg not found.** MP4 and WebM output need ffmpeg. PNG sequence output (`"format": "png"`) works without it.
 
-- **What to do:** install ffmpeg and make sure `ffmpeg` runs in a terminal, or point to it with `--ffmpeg <path>` or the `SR_FFMPEG` environment variable. Automatic download is planned for Phase 6.
+- **What to do (Windows):** open Terminal and run `winget install Gyan.FFmpeg`, then render again. ScrollRecord finds winget's ffmpeg right away. Alternatively, put `ffmpeg.exe` next to `scrollrecord.exe`.
+- **What to do (Linux/macOS):** `sudo apt install ffmpeg` / `brew install ffmpeg`.
+- You can also point to it with `--ffmpeg <path>` or the `SR_FFMPEG` environment variable. Automatic download is planned for Phase 6.
 
 ## SR-5002
 

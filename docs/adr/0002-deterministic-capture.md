@@ -18,13 +18,14 @@ Option 3, implemented in `crates/sr-browser/js/runtime.js` plus two CDP settings
 - **Frozen page clock.** `setTimeout`/`setInterval`, `requestAnimationFrame`, `performance.now` and `Date` are replaced before any page script runs. Page time starts at 0 and moves only when ScrollRecord advances it by exactly `1000/fps` ms per frame.
 - **CSS & Web animations.** Every animation is paused the first time it appears, then positioned explicitly (`currentTime = page time since it appeared`). Animations that the site itself paused are left alone.
 - **Browser animation clock at speed 0** (`Animation.setPlaybackRate(0)`, re-applied after each navigation). Without it, a transition the page starts between frames (e.g. a scroll-reveal fired during load) plays in real time and may finish before ScrollRecord sees it. On a busy machine the first frames then differed between runs. Found by the e2e test under load.
-- **IntersectionObserver settle.** "Element entered the viewport" callbacks are computed by the browser in real time. If the page created observers, each frame waits two real rendering steps so the callbacks run before the screenshot. Pages without observers skip the wait.
+- **IntersectionObserver delivery.** The browser computes "element entered the viewport" during real-time rendering and normally calls the page back in a task whose timing depends on machine load. Waiting for it was not enough: in 1 of about 7 runs a reveal started one frame later. ScrollRecord therefore wraps `IntersectionObserver`, waits two real rendering steps after scrolling (intersections are computed by then), takes the pending records with `takeRecords()` and calls the page's callback itself at that fixed point. Pages without observers skip all of this.
 - **Real scrolling.** `window.scrollTo` per frame (instant), plus a synthetic `scroll` event, so sticky headers, scroll-linked effects and lazy content behave like for a real visitor.
 - **Own minimal CDP client** (`cdp.rs`, synchronous, ~150 lines) instead of a large async library: about a dozen commands are needed, and small explicit code is easier to maintain for this project (HANDOFF D-19).
 
 ## Results (fixture 01, this ADR's date)
 - 0 repeated frames during scroll segments (desktop 1080p60, iPhone 9:16 1080p60).
-- Two renders are byte-identical: desktop 519/519 frames, mobile 577/577. The e2e test passes repeatedly with 3 renders running in parallel.
+- Renders are byte-identical: desktop 519/519 frames, mobile 577/577. Six mobile renders, three at a time under heavy load, gave identical frames. Encoding identical frames gives byte-identical MP4s.
+- How the last race was found: two MP4s of the same scenario differed. Frame comparison showed one reveal card one frame behind, and the encoder's later decisions made every following frame differ slightly. Lesson: compare PNG frames, not MP4 files, when checking determinism.
 - Cost: about 5–9 rendered frames per second at 1080p on the build machine. The observer settle adds roughly 30 % on pages that use IntersectionObserver.
 
 ## Consequences / known limits

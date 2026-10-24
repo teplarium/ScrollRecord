@@ -65,7 +65,13 @@ pub fn open_sink(
 
 // ── Finding ffmpeg ──────────────────────────────────────────────────────────
 
-/// Returns the ffmpeg executable: explicit path → `SR_FFMPEG` → `PATH`.
+/// Returns the ffmpeg executable. Search order: explicit path → `SR_FFMPEG`
+/// → next to the ScrollRecord executable → `PATH` → known install folders
+/// (on Windows: winget and `C:\ffmpeg`).
+///
+/// Why so many places: on Windows, `winget install Gyan.FFmpeg` only updates
+/// `PATH` for *new* terminals, and many users simply unzip ffmpeg somewhere.
+/// Dropping `ffmpeg.exe` next to `scrollrecord.exe` always works.
 pub fn find_ffmpeg(explicit: Option<&Path>) -> AppResult<PathBuf> {
     let not_found = |what: String| AppError::new(ErrorCode::FfmpegNotFound, what);
     if let Some(p) = explicit {
@@ -87,17 +93,95 @@ pub fn find_ffmpeg(explicit: Option<&Path>) -> AppResult<PathBuf> {
             )))
         };
     }
+    ffmpeg_candidates()
+        .into_iter()
+        .find(|p| p.is_file())
+        .ok_or_else(|| {
+            not_found(format!(
+                "ffmpeg is not installed or not on PATH. {INSTALL_HINT}"
+            ))
+        })
+}
+
+/// How to get ffmpeg, shown in the SR-5001 message.
+#[cfg(windows)]
+const INSTALL_HINT: &str =
+    "Install it with `winget install Gyan.FFmpeg`, or put ffmpeg.exe next to scrollrecord.exe";
+#[cfg(target_os = "macos")]
+const INSTALL_HINT: &str = "Install it with `brew install ffmpeg`";
+#[cfg(all(unix, not(target_os = "macos")))]
+const INSTALL_HINT: &str = "Install it with your package manager, e.g. `sudo apt install ffmpeg`";
+
+/// Places where ffmpeg is commonly found, in priority order.
+fn ffmpeg_candidates() -> Vec<PathBuf> {
     let name = if cfg!(windows) {
         "ffmpeg.exe"
     } else {
         "ffmpeg"
     };
-    std::env::var_os("PATH")
-        .into_iter()
-        .flat_map(|path| std::env::split_paths(&path).collect::<Vec<_>>())
-        .map(|dir| dir.join(name))
-        .find(|p| p.is_file())
-        .ok_or_else(|| not_found("ffmpeg is not installed or not on PATH".into()))
+    let mut out = Vec::new();
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(Path::to_path_buf))
+    {
+        out.push(dir.join(name));
+    }
+    if let Some(path) = std::env::var_os("PATH") {
+        out.extend(std::env::split_paths(&path).map(|dir| dir.join(name)));
+    }
+    out.extend(platform_candidates());
+    out
+}
+
+#[cfg(windows)]
+fn platform_candidates() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+        out.extend(winget_candidates(&local.join("Microsoft").join("WinGet")));
+    }
+    out.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
+    if let Some(pf) = std::env::var_os("ProgramFiles").map(PathBuf::from) {
+        out.push(pf.join("ffmpeg").join("bin").join("ffmpeg.exe"));
+    }
+    out
+}
+
+/// ffmpeg locations inside a winget folder (`%LOCALAPPDATA%\Microsoft\WinGet`):
+/// the `Links` shim, and portable packages unpacked as
+/// `Packages\<id containing FFmpeg>\<version folder>\bin\ffmpeg.exe`.
+/// Platform-independent so it can be tested anywhere.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn winget_candidates(winget: &Path) -> Vec<PathBuf> {
+    let mut out = vec![winget.join("Links").join("ffmpeg.exe")];
+    let Ok(packages) = std::fs::read_dir(winget.join("Packages")) else {
+        return out;
+    };
+    for pkg in packages.flatten() {
+        if !pkg.file_name().to_string_lossy().contains("FFmpeg") {
+            continue;
+        }
+        if let Ok(versions) = std::fs::read_dir(pkg.path()) {
+            out.extend(
+                versions
+                    .flatten()
+                    .map(|v| v.path().join("bin").join("ffmpeg.exe")),
+            );
+        }
+    }
+    out
+}
+
+#[cfg(not(windows))]
+fn platform_candidates() -> Vec<PathBuf> {
+    [
+        "/usr/local/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
+        "/opt/homebrew/bin/ffmpeg",
+        "/snap/bin/ffmpeg",
+    ]
+    .iter()
+    .map(PathBuf::from)
+    .collect()
 }
 
 // ── PNG sequence ────────────────────────────────────────────────────────────
@@ -401,6 +485,27 @@ mod tests {
         sink.finish().unwrap();
         assert_eq!(std::fs::read(dir.join("frame_000012.png")).unwrap(), b"b");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn finds_ffmpeg_unpacked_by_winget() {
+        let winget = std::env::temp_dir().join(format!("sr-winget-test-{}", std::process::id()));
+        let bin = winget
+            .join("Packages")
+            .join("Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe");
+        let exe = bin
+            .join("ffmpeg-7.1-full_build")
+            .join("bin")
+            .join("ffmpeg.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::write(&exe, b"").unwrap();
+        std::fs::create_dir_all(winget.join("Packages").join("Other.Tool")).unwrap();
+
+        let found = winget_candidates(&winget);
+        assert_eq!(found[0], winget.join("Links").join("ffmpeg.exe"));
+        assert!(found.contains(&exe), "{found:?}");
+        assert_eq!(found.len(), 2, "unrelated packages are ignored");
+        let _ = std::fs::remove_dir_all(&winget);
     }
 
     #[test]

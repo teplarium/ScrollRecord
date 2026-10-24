@@ -95,6 +95,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 
 | Path | Purpose |
 |---|---|
+| `packaging/cli/` | Files shipped in the CLI package: `README.txt`, `render(.bat/.sh)` (drag & drop), `render-example(.bat/.sh)` |
+| `scripts/package-cli.sh` | Builds `dist/ScrollRecord-CLI/` (used by CI job `cli`) |
 | `examples/` | Example scenarios; `01-plain-landing.srflow.json` renders the fixture site (desktop 16:9 + iPhone 9:16) |
 | `tests/fixtures/sites/` | Test pages for capture (`01-plain-landing/`: plain HTML/CSS/JS with `data-sr` blocks) |
 | `HANDOFF.md` | Requirements, decisions (D-xx), roadmap (Russian) |
@@ -102,7 +104,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `CONTRIBUTING.md` | Dev setup, workflow, recipes |
 | `docs/ERRORS.md` | Error catalog: one `## SR-xxxx` section per code |
 | `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture |
-| `.github/` | CI (Rust + UI on Windows & Linux, installers as artifacts), issue forms |
+| `.github/` | CI (Rust + UI on Windows & Linux; artifacts: CLI package + installers), issue forms |
 | `.cargo/config.toml` | Where ts-rs writes TypeScript bindings |
 | `rust-toolchain.toml` | Pinned Rust version (1.97.0) |
 
@@ -151,7 +153,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `SR-2101` / `SR-2102` block not found / ambiguous | Locators in the scenario; `runtime.js` → `findAll()`; message lists what was tried |
 | `SR-2001` / `SR-2002` scenario errors | `sr-core/src/flow/` (`mod.rs` parsing, `path.rs` checks). Run `scrollrecord validate` |
 | `SR-3001`–`SR-3005` browser problems | `sr-browser` (`locate.rs`, `process.rs`, `cdp.rs`, `page.rs`); run with `-v` |
-| `SR-5001` / `SR-5002` encoding | `sr-encoder` (`find_ffmpeg`, `ffmpeg_args`); `detail` param has ffmpeg's output |
+| `SR-5001` / `SR-5002` encoding | `sr-encoder` (`find_ffmpeg` / `ffmpeg_candidates` search order, `ffmpeg_args`); `detail` param has ffmpeg's output |
+| `render.bat` / CLI package problems | `packaging/cli/`, `scripts/package-cli.sh`, CI job `cli` |
 | `SR-8001`–`SR-8003` site | `sr-site` (`SiteSource::parse`, `server.rs`) |
 | Wrong video size / aspect | `sr-core/src/flow/target.rs` → `Target::geometry`; ffmpeg `scale=` in `sr-encoder` |
 | Colours look washed out | `sr-encoder` → `ffmpeg_args` (BT.709 tagging) |
@@ -193,4 +196,5 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | Date | Change |
 |---|---|
 | 2026-10-24 | Phase 0: workspace, `sr-core`, `sr-ipc`, `sr-diagnostics`, `sr-cli`, Tauri + React shell, i18n, CI, docs |
+| 2026-10-24 | CLI package: `packaging/cli/`, `scripts/package-cli.sh`, CI job `cli`; IntersectionObserver delivery made deterministic (ADR 0002) |
 | 2026-10-24 | Phase 1: scenario format v1 in `sr-core`; new crates `sr-site`, `sr-browser`, `sr-timeline`, `sr-capture`, `sr-encoder`, `sr-render`; CLI `render`/`validate`; `examples/`; fixture 01 extended; ADR 0002 |

@@ -1,9 +1,12 @@
 # CI — the safety net that replaces human code review (HANDOFF NFR-12).
 # Runs on every push to main and every pull request:
-#   rust   — format, lints, tests on Windows + Linux; checks generated TS bindings
+#   rust   — format, lints, tests on Windows + Linux (incl. a real-browser render
+#            test when Chrome is available); checks generated TS bindings
 #   ui     — lint, format, typecheck, tests, production build
-#   bundle — builds installers (Windows .exe, Linux .deb/.AppImage) and attaches
-#            them to the run, so anyone can download and try a change
+#   cli    — builds the ready-to-use command-line package (scrollrecord.exe +
+#            example + launchers) and attaches it as "ScrollRecord-CLI-<OS>"
+#   bundle — builds desktop installers (Windows .exe, Linux .deb/.AppImage) and
+#            attaches them, so anyone can download and try a change
 name: CI
 
 on:
@@ -28,7 +31,7 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Linux system libraries (WebKitGTK for Tauri)
         if: runner.os == 'Linux'
@@ -65,9 +68,9 @@ jobs:
     name: UI
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -76,6 +79,43 @@ jobs:
         run: pnpm check
       - name: Production build
         run: pnpm build:ui
+
+  cli:
+    name: CLI package (${{ matrix.os }})
+    needs: [rust]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build scrollrecord
+        run: cargo build --release -p sr-cli
+
+      - name: Package (program + launchers + example)
+        shell: bash
+        run: bash scripts/package-cli.sh
+
+      - name: Smoke test the package
+        shell: bash
+        run: |
+          cd dist/ScrollRecord-CLI
+          ./scrollrecord info
+          ./scrollrecord validate example/lumen.srflow.json
+
+      - name: Upload package
+        uses: actions/upload-artifact@v6
+        with:
+          name: ScrollRecord-CLI-${{ runner.os }}
+          path: dist/ScrollRecord-CLI/
+          if-no-files-found: error
 
   bundle:
     name: Installer (${{ matrix.os }})
@@ -86,7 +126,7 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Linux system libraries (WebKitGTK for Tauri)
         if: runner.os == 'Linux'
@@ -99,8 +139,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -110,7 +150,7 @@ jobs:
         run: pnpm build
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ScrollRecord-${{ runner.os }}
           if-no-files-found: error

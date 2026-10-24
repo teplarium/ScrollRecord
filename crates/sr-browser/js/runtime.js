@@ -103,24 +103,56 @@
   }
 
   // ── Intersection observers (scroll-reveal effects) ────────────────────────
-  // The browser reports "element entered the viewport" during its own,
-  // real-time rendering. To make that deterministic, frame() waits for the
-  // browser to deliver those reports before the frame is captured. Pages
-  // without observers skip the wait and render faster.
-  let observerCount = 0;
+  // The browser computes "element entered the viewport" during its own
+  // real-time rendering and normally delivers the callbacks in a task whose
+  // timing depends on how busy the machine is. That made a reveal start one
+  // frame earlier or later between runs. So ScrollRecord delivers them
+  // itself at a fixed point of every frame: wait until the browser has
+  // computed intersections for the new scroll position, then take the
+  // pending records (takeRecords) and call the page's callback directly.
+  // Pages without observers skip all of this and render faster.
+  const observers = new Set(); // WeakRef<IntersectionObserver>
+  const observerCallbacks = new WeakMap();
   if (typeof window.IntersectionObserver === "function") {
     const RealObserver = window.IntersectionObserver;
     window.IntersectionObserver = class IntersectionObserver extends RealObserver {
       constructor(callback, options) {
         super(callback, options);
-        observerCount++;
+        observerCallbacks.set(this, callback);
+        observers.add(new WeakRef(this));
       }
     };
   }
-  // Two real rendering steps: in the first the browser computes
-  // intersections and queues the callbacks; they run before the second.
+  function deliverObserverRecords() {
+    for (const ref of observers) {
+      const observer = ref.deref();
+      if (!observer) {
+        observers.delete(ref);
+        continue;
+      }
+      const records = observer.takeRecords();
+      const callback = observerCallbacks.get(observer);
+      if (records.length && typeof callback === "function") {
+        try {
+          callback.call(observer, records, observer);
+        } catch (err) {
+          console.error("[page error during ScrollRecord frame]", err);
+        }
+      }
+    }
+  }
+  // Rendering step 1 runs our callback, then computes intersections for the
+  // new scroll position. In rendering step 2 those results are guaranteed to
+  // exist: either already delivered by the browser, or waiting to be taken.
   const settleObservers = () =>
-    new Promise((resolve) => realRequestFrame(() => realRequestFrame(resolve)));
+    new Promise((resolve) =>
+      realRequestFrame(() =>
+        realRequestFrame(() => {
+          deliverObserverRecords();
+          resolve();
+        }),
+      ),
+    );
 
   // ── CSS & Web animations ──────────────────────────────────────────────────
   // Every animation is paused the first time we see it and then positioned
@@ -265,7 +297,7 @@
       document.dispatchEvent(new Event("scroll", { bubbles: true }));
       advance(dtMs);
       syncAnimations();
-      if (observerCount > 0) {
+      if (observers.size > 0) {
         await settleObservers();
         // Transitions started by observer callbacks begin at this frame's time.
         syncAnimations();

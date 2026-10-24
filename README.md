@@ -31,7 +31,12 @@ Your own site: copy the example, set `"site"` to your site folder (or `http://lo
 
 ## Download
 
-No releases yet. Every successful CI run attaches test installers for Windows (`.exe`) and Linux (`.deb`, `.AppImage`) under **Actions → CI → Artifacts**.
+No releases yet. Every successful CI run attaches test builds under **Actions → CI → (latest run) → Artifacts**:
+
+| Artifact | What it is |
+|---|---|
+| `ScrollRecord-CLI-Windows` / `-Linux` | **Works today:** `scrollrecord` command-line renderer + example. Unzip and double-click `render-example.bat`, or drag a `*.srflow.json` onto `render.bat`. See its `README.txt` |
+| `ScrollRecord-Windows` / `-Linux` | Desktop app installer (start screen only until Phase 3) |
 
 ## Build from source
 

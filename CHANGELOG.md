@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Added — ready-to-use command-line package
+- Every CI run now builds `ScrollRecord-CLI-Windows` (and `-Linux`): `scrollrecord.exe`, an example site with its scenario, and launchers. Double-click `render-example.bat` to render the example, or drag your own `*.srflow.json` onto `render.bat`. The videos folder opens when done.
+- ffmpeg is also found next to `scrollrecord.exe` and right after `winget install Gyan.FFmpeg` (no new terminal needed). The "ffmpeg not found" message says how to install it.
+
+### Fixed
+- Scroll-reveal effects could, rarely, start one frame later in one render than in another. ScrollRecord now delivers "element entered the viewport" events to the page itself at a fixed moment, so repeated renders are identical even on a busy machine.
+
 ### Added — Phase 1: first real videos
 - `scrollrecord render scenario.srflow.json` records smooth scroll videos of a website: MP4 (H.264), WebM (VP9) or PNG frames.
 - Every frame is drawn completely before it's saved, so videos never stutter, even on slow machines. Rendering the same scenario twice gives exactly the same frames.
