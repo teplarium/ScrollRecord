@@ -3,12 +3,16 @@
 //! Runs only when Chrome/Edge/Chromium is installed (CI runners have Chrome);
 //! otherwise it prints "skipped" and passes, so `cargo test` works anywhere.
 
+// Test helpers may panic on failure: that is how a test reports it.
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use std::time::Duration;
 
 use sr_browser::{
-    BlockMeasure, Browser, Emulation, FrameDriver, LaunchOptions, PrepareOptions, find_browser,
+    BlockMeasure, Browser, Emulation, FrameDriver, LaunchOptions, PointerInput, PrepareOptions,
+    PressEvent, find_browser,
 };
-use sr_core::flow::Locator;
+use sr_core::flow::{CursorKind, Locator, MeasureItem};
 
 const PAGE: &str = "data:text/html,<html><head><style>body{margin:0} \
     .pulse{animation:fade 1000ms linear infinite} @keyframes fade{to{opacity:0}}</style></head>\
@@ -16,18 +20,35 @@ const PAGE: &str = "data:text/html,<html><head><style>body{margin:0} \
     <div data-sr='b' class='pulse' style='height:600px'>B</div>\
     <div class='dup'>x</div><div class='dup'>y</div></body></html>";
 
-#[test]
-fn virtual_time_scrolling_measuring_and_capture() {
+fn start() -> Option<Browser> {
     let Ok(path) = find_browser(None) else {
         eprintln!("skipped: no Chromium-based browser installed");
-        return;
+        return None;
     };
     let mut opts = LaunchOptions::default();
     if cfg!(target_os = "linux") {
         // CI containers often forbid Chrome's sandbox; the test page is local and trusted.
         opts.extra_args.push("--no-sandbox".into());
     }
-    let mut browser = Browser::launch(&path, &opts).expect("launch");
+    Some(Browser::launch(&path, &opts).expect("launch"))
+}
+
+/// Scroll + time only, no pointer.
+fn step(page: &mut impl FrameDriver, y: f64, dt: f64) -> f64 {
+    page.step(y, dt, &PointerInput::default()).unwrap().scroll_y
+}
+
+fn item(id: &str, locators: Vec<Locator>, within: Option<&str>) -> MeasureItem {
+    MeasureItem {
+        id: id.into(),
+        locators,
+        within: within.map(str::to_owned),
+    }
+}
+
+#[test]
+fn virtual_time_scrolling_measuring_and_capture() {
+    let Some(mut browser) = start() else { return };
     let mut page = browser.new_page().expect("page");
     page.emulate(&Emulation {
         css_width: 800,
@@ -46,13 +67,13 @@ fn virtual_time_scrolling_measuring_and_capture() {
     assert_eq!(page.eval("performance.now()").unwrap(), 0.0);
     page.eval("window.hits = 0; setTimeout(() => hits++, 50); 1")
         .unwrap();
-    page.step(0.0, 40.0).unwrap();
+    step(&mut page, 0.0, 40.0);
     assert_eq!(
         page.eval("hits").unwrap(),
         0.0,
         "timer must not fire before 50ms"
     );
-    page.step(0.0, 20.0).unwrap();
+    step(&mut page, 0.0, 20.0);
     assert_eq!(
         page.eval("hits").unwrap(),
         1.0,
@@ -69,33 +90,31 @@ fn virtual_time_scrolling_measuring_and_capture() {
     );
 
     // ── Scrolling is applied and clamped by the browser ──
-    assert_eq!(page.step(700.0, 16.0).unwrap(), 700.0);
+    assert_eq!(step(&mut page, 700.0, 16.0), 700.0);
     let max = page
         .eval("document.documentElement.scrollHeight - innerHeight")
         .unwrap();
     assert_eq!(
-        page.step(99_999.0, 16.0).unwrap(),
+        step(&mut page, 99_999.0, 16.0),
         max.as_f64().unwrap(),
         "clamped at the bottom"
     );
 
     // ── Measuring blocks ──
     let blocks = vec![
-        ("a".to_owned(), vec![Locator::sr("a")]),
-        (
-            "b".to_owned(),
-            vec![Locator::sr("missing"), Locator::sr("b")],
-        ),
-        (
-            "dup".to_owned(),
+        item("a", vec![Locator::sr("a")], None),
+        item("b", vec![Locator::sr("missing"), Locator::sr("b")], None),
+        item(
+            "dup",
             vec![Locator {
                 css: Some(".dup".into()),
                 ..Locator::default()
             }],
+            None,
         ),
-        ("none".to_owned(), vec![Locator::sr("nope")]),
+        item("none", vec![Locator::sr("nope")], None),
     ];
-    page.step(0.0, 0.0).unwrap();
+    step(&mut page, 0.0, 0.0);
     let m = page.measure(&blocks).expect("measure");
     assert_eq!(m.viewport_height, 600.0);
     assert!(m.scroll_height >= 1600.0);
@@ -104,6 +123,8 @@ fn virtual_time_scrolling_measuring_and_capture() {
         BlockMeasure::Found {
             top: 0.0,
             height: 1000.0,
+            left: 0.0,
+            width: 800.0,
             matched: 0
         }
     );
@@ -112,6 +133,8 @@ fn virtual_time_scrolling_measuring_and_capture() {
         BlockMeasure::Found {
             top: 1000.0,
             height: 600.0,
+            left: 0.0,
+            width: 800.0,
             matched: 1
         }
     );
@@ -126,5 +149,138 @@ fn virtual_time_scrolling_measuring_and_capture() {
     assert_eq!((width, height), (800, 600));
 
     page.close().expect("close tab");
+    browser.close();
+}
+
+/// Two sections with a "Buy" button each; the second slides in on reveal.
+const POINTER_PAGE: &str = "data:text/html,<!doctype html><html><head><style>\
+    body{margin:0;font:16px sans-serif} section{height:600px;position:relative}\
+    .btn{position:absolute;left:100px;top:100px;width:200px;height:50px;background:rgb(0,0,255);cursor:pointer}\
+    .btn:hover{background:rgb(255,0,0)}\
+    .slide{transform:translateY(80px);transition:transform 300ms linear}.slide.in{transform:none}\
+    </style></head><body>\
+    <section data-sr='one'><p style='margin:0;padding:300px 0 0 20px'>Plain words here</p>\
+      <a class='btn' href='%23'>Buy</a></section>\
+    <section data-sr='two'><div class='slide'><a class='btn' href='%23'>Buy</a></div></section>\
+    <div style='height:600px'></div>\
+    <script>new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&e.target.classList.add('in')))\
+      .observe(document.querySelector('.slide'));\
+      window.clicks=0;document.addEventListener('click',e=>{e.preventDefault();clicks++})</script>\
+    </body></html>";
+
+#[test]
+fn pointer_hover_click_cursor_kind_and_probe() {
+    let Some(mut browser) = start() else { return };
+    let mut page = browser.new_page().expect("page");
+    page.emulate(&Emulation {
+        css_width: 800,
+        css_height: 600,
+        scale: 1.0,
+        mobile: false,
+        touch: false,
+        user_agent: None,
+    })
+    .unwrap();
+    page.navigate(POINTER_PAGE, Duration::from_secs(30))
+        .unwrap();
+    page.prepare(&PrepareOptions::default()).unwrap();
+    let bg = |page: &mut sr_browser::Page<'_>, n: usize| {
+        page.eval(&format!(
+            "getComputedStyle(document.querySelectorAll('.btn')[{n}]).backgroundColor"
+        ))
+        .unwrap()
+    };
+
+    // ── Action targets are searched inside their block ──
+    let buy = || {
+        vec![Locator {
+            text: Some("Buy".into()),
+            ..Locator::default()
+        }]
+    };
+    let items = [
+        item("one", vec![Locator::sr("one")], None),
+        item("two", vec![Locator::sr("two")], None),
+        item("two#0", buy(), Some("two")),
+    ];
+    let m = page.measure(&items).unwrap();
+    let BlockMeasure::Found { top: before, .. } = m.blocks["two#0"] else {
+        panic!("{:?}", m.blocks["two#0"])
+    };
+    assert_eq!(before, 600.0 + 100.0 + 80.0, "measured before the slide-in");
+
+    // ── Probe: after the reveal the button sits 80px higher ──
+    let probed = page.probe(600.0, 2000.0, &items).unwrap();
+    let BlockMeasure::Found {
+        top, left, width, ..
+    } = probed.blocks["two#0"]
+    else {
+        panic!()
+    };
+    assert_eq!((top, left, width), (700.0, 100.0, 200.0));
+
+    // Fresh page for the pointer part (the probe changed it).
+    page.navigate(POINTER_PAGE, Duration::from_secs(30))
+        .unwrap();
+    page.prepare(&PrepareOptions::default()).unwrap();
+
+    // ── Live pointer: hover reacts at once, cursor kind follows CSS ──
+    let at = |x: f64, y: f64, live: bool| PointerInput {
+        x,
+        y,
+        live,
+        detect_kind: true,
+        events: Vec::new(),
+    };
+    let r = page.step(0.0, 16.0, &at(150.0, 120.0, true)).unwrap();
+    assert_eq!(r.cursor_kind, Some(CursorKind::Pointer));
+    assert_eq!(
+        bg(&mut page, 0),
+        "rgb(255, 0, 0)",
+        "hovered in the same frame"
+    );
+    let r = page.step(0.0, 16.0, &at(40.0, 309.0, true)).unwrap();
+    assert_eq!(
+        r.cursor_kind,
+        Some(CursorKind::Text),
+        "I-beam over plain text"
+    );
+    assert_eq!(bg(&mut page, 0), "rgb(0, 0, 255)");
+    let r = page.step(0.0, 16.0, &at(600.0, 500.0, true)).unwrap();
+    assert_eq!(r.cursor_kind, Some(CursorKind::Arrow));
+
+    // ── A still pointer over scrolling content re-hovers deterministically ──
+    page.step(0.0, 16.0, &at(150.0, 120.0, true)).unwrap();
+    page.step(600.0, 16.0, &at(150.0, 120.0, true)).unwrap();
+    assert_eq!(
+        bg(&mut page, 0),
+        "rgb(0, 0, 255)",
+        "first button scrolled away"
+    );
+
+    // ── Visual mode takes the mouse off the page ──
+    page.step(0.0, 16.0, &at(150.0, 120.0, false)).unwrap();
+    assert_eq!(bg(&mut page, 0), "rgb(0, 0, 255)");
+
+    // ── Real click ──
+    let mut click = at(150.0, 120.0, true);
+    click.events = vec![
+        PressEvent {
+            down: true,
+            touch: false,
+            x: 150.0,
+            y: 120.0,
+        },
+        PressEvent {
+            down: false,
+            touch: false,
+            x: 150.0,
+            y: 120.0,
+        },
+    ];
+    page.step(0.0, 16.0, &click).unwrap();
+    assert_eq!(page.eval("clicks").unwrap(), 1.0);
+
+    page.close().unwrap();
     browser.close();
 }

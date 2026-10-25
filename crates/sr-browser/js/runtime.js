@@ -2,7 +2,8 @@
 // own scripts run (Page.addScriptToEvaluateOnNewDocument).
 //
 // Purpose: gives ScrollRecord full control over time and scrolling inside the
-//          page, plus helpers to prepare the page and measure blocks.
+//          page, plus helpers to prepare the page, measure blocks and report
+//          which cursor image (arrow / hand / I-beam) the page shows.
 // Solves:  screen recording in real time stutters, because the browser can't
 //          always draw 60 frames per second. Here the page's clock is frozen
 //          and moved forward by exactly 1/fps per video frame, so every frame
@@ -273,6 +274,44 @@
     return inset;
   }
 
+  // ── Cursor image under the pointer (HANDOFF FR-CUR-03) ────────────────────
+  // Same rules as a desktop browser: CSS `cursor` wins; `auto` shows the
+  // I-beam over editable fields and over selectable text, otherwise an arrow.
+  const TEXT_INPUTS =
+    'textarea, input:not([type]), input[type="text"], input[type="email"], input[type="search"], ' +
+    'input[type="password"], input[type="url"], input[type="tel"], input[type="number"]';
+  function cursorKind(x, y) {
+    const el = document.elementFromPoint(x, y);
+    if (!el) return "arrow";
+    const cs = getComputedStyle(el);
+    if (cs.cursor === "pointer") return "pointer";
+    if (cs.cursor === "text" || cs.cursor === "vertical-text") return "text";
+    if (cs.cursor !== "auto") return "arrow";
+    if (el.isContentEditable || el.matches(TEXT_INPUTS)) return "text";
+    if (cs.userSelect === "none") return "arrow";
+    const caret = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+    const node = caret && caret.startContainer;
+    if (node && node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects()) {
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return "text";
+      }
+    }
+    return "arrow";
+  }
+
+  // True while a finite animation or transition is still playing (used by
+  // the probe to know when a block has finished appearing).
+  function animationsBusy() {
+    for (const anim of document.getAnimations()) {
+      if (sitePaused.has(anim) || !anim.effect) continue;
+      const end = anim.effect.getComputedTiming().endTime;
+      if (Number.isFinite(end) && (Number(anim.currentTime) || 0) < end) return true;
+    }
+    return false;
+  }
+
   const realWait = (ms) => new Promise((resolve) => realSetTimeout(resolve, ms));
   const withTimeout = (promise, ms) => Promise.race([promise, realWait(ms)]);
 
@@ -352,8 +391,38 @@
       return { invalidSelectors: invalid };
     },
 
-    /** Measures blocks in page coordinates (CSS px). */
-    measure(blocks) {
+    /**
+     * Pointer bookkeeping after ScrollRecord sent mouse/touch input for this
+     * frame: hover transitions that just started begin at this frame's time.
+     * Returns the cursor image the page asks for under (x, y), if wanted.
+     */
+    pointer(x, y, sync, wantKind) {
+      if (sync) syncAnimations();
+      return wantKind ? cursorKind(x, y) : null;
+    },
+
+    /**
+     * Probe: scrolls to `scrollY` and lets the page settle (reveal effects,
+     * transitions) for at most `maxMs` of page time. Used before recording
+     * to find where buttons are once a block has appeared; the page is
+     * reloaded afterwards, so the probe never shows up in the video.
+     */
+    async settleAt(scrollY, maxMs) {
+      const step = 50;
+      for (let waited = 0; waited < maxMs; waited += step) {
+        await this.frame(scrollY, step);
+        // At least a few steps: reveals start only after observers fire.
+        if (waited >= 3 * step && !animationsBusy()) break;
+      }
+      return now;
+    },
+
+    /**
+     * Measures elements in page coordinates (CSS px). Items with `within`
+     * (targets of actions) are searched inside that block's element first,
+     * so `{ "text": "Start" }` means the Start button *of this block*.
+     */
+    measure(items) {
       const result = {
         viewportWidth: innerWidth,
         viewportHeight: innerHeight,
@@ -361,11 +430,13 @@
         topInset: topInset(),
         blocks: {},
       };
-      for (const block of blocks) {
+      const elements = new Map();
+      for (const item of items) {
+        const scope = item.within != null ? elements.get(item.within) : null;
         const tried = [];
         let found = null;
         let ambiguous = false;
-        block.locators.forEach((loc, index) => {
+        item.locators.forEach((loc, index) => {
           if (found) return;
           let els;
           try {
@@ -374,20 +445,27 @@
             tried.push(`${describe(loc)}: invalid (${err.message})`);
             return;
           }
+          if (scope) {
+            const inside = els.filter((el) => scope.contains(el) && el !== scope);
+            if (inside.length) els = inside;
+          }
           if (loc.nth != null) els = els[loc.nth] ? [els[loc.nth]] : [];
           tried.push(`${describe(loc)}: ${els.length} match${els.length === 1 ? "" : "es"}`);
           if (els.length === 1) found = { el: els[0], index };
           else if (els.length > 1) ambiguous = true;
         });
         if (!found) {
-          result.blocks[block.id] = { status: ambiguous ? "ambiguous" : "not_found", tried };
+          result.blocks[item.id] = { status: ambiguous ? "ambiguous" : "not_found", tried };
           continue;
         }
+        elements.set(item.id, found.el);
         const r = found.el.getBoundingClientRect();
-        result.blocks[block.id] = {
+        result.blocks[item.id] = {
           status: "found",
           top: r.top + scrollY,
           height: r.height,
+          left: r.left + scrollX,
+          width: r.width,
           matched: found.index,
         };
       }

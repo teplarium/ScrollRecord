@@ -1,7 +1,10 @@
 //! # sr-encoder — frames in, video file out
 //!
-//! Purpose: implements [`FrameSink`] for the output formats: MP4 (H.264) and
+//! Purpose: implements [`VideoSink`] for the output formats: MP4 (H.264) and
 //!          WebM (VP9) via an external `ffmpeg` process, or a folder of PNGs.
+//! Input:   finished frames as raw RGBA (the compositor has already drawn
+//!          the cursor). Raw pixels need no decoding inside ffmpeg; the size
+//!          is taken from the first frame, so ffmpeg starts on that frame.
 //! Solves:  ffmpeg is the most reliable encoder on every OS. Running it as a
 //!          separate program (frames piped into its stdin, no temp files)
 //!          avoids linking codec libraries and their licences (HANDOFF D-09).
@@ -16,7 +19,6 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
-use sr_capture::FrameSink;
 use sr_core::flow::OutputFormat;
 use sr_core::{AppError, AppResult, ErrorCode};
 
@@ -48,12 +50,24 @@ pub struct EncodeSettings {
     pub quality: Quality,
 }
 
+/// Receives finished frames in order.
+pub trait VideoSink {
+    /// Takes frame `index`: `rgba` holds `width × height` pixels, 4 bytes
+    /// each, rows top to bottom. Every frame must have the same size.
+    fn push(&mut self, index: u32, width: u32, height: u32, rgba: &[u8]) -> AppResult<()>;
+
+    /// Called once after the last frame (flush, close files, finish encoding).
+    fn finish(&mut self) -> AppResult<()>;
+}
+
 /// Opens the right sink for `settings.format`. For PNG, `output` is a folder.
+/// For video, ffmpeg is located now (so a missing ffmpeg fails before any
+/// capture work) and started with the first frame.
 pub fn open_sink(
     output: &Path,
     settings: &EncodeSettings,
     ffmpeg: Option<&Path>,
-) -> AppResult<Box<dyn FrameSink>> {
+) -> AppResult<Box<dyn VideoSink + Send>> {
     match settings.format {
         OutputFormat::Png => Ok(Box::new(PngSequence::create(output)?)),
         OutputFormat::Mp4 | OutputFormat::Webm => {
@@ -202,15 +216,38 @@ impl PngSequence {
     }
 }
 
-impl FrameSink for PngSequence {
-    fn push(&mut self, index: u32, png: &[u8]) -> AppResult<()> {
+impl VideoSink for PngSequence {
+    fn push(&mut self, index: u32, width: u32, height: u32, rgba: &[u8]) -> AppResult<()> {
         let path = self.dir.join(format!("frame_{index:06}.png"));
-        std::fs::write(&path, png).map_err(|err| write_error(&path, &err))
+        let mut bytes = Vec::new();
+        encode_png(&mut bytes, width, height, rgba).map_err(|err| {
+            AppError::new(
+                ErrorCode::EncoderFailed,
+                format!("{}: {err}", path.display()),
+            )
+        })?;
+        std::fs::write(&path, bytes).map_err(|err| write_error(&path, &err))
     }
 
     fn finish(&mut self) -> AppResult<()> {
         Ok(())
     }
+}
+
+// Fast compression: frames are big and many; disk space matters less than time.
+fn encode_png(
+    out: &mut Vec<u8>,
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+) -> Result<(), png::EncodingError> {
+    let mut enc = png::Encoder::new(out, width, height);
+    enc.set_color(png::ColorType::Rgba);
+    enc.set_depth(png::BitDepth::Eight);
+    enc.set_compression(png::Compression::Fast);
+    let mut writer = enc.write_header()?;
+    writer.write_image_data(rgba)?;
+    writer.finish()
 }
 
 fn write_error(path: &Path, err: &std::io::Error) -> AppError {
@@ -223,9 +260,13 @@ fn write_error(path: &Path, err: &std::io::Error) -> AppError {
 
 // ── ffmpeg ──────────────────────────────────────────────────────────────────
 
-/// Streams PNG frames into an ffmpeg process.
+/// Streams raw RGBA frames into an ffmpeg process.
 #[derive(Debug)]
 pub struct FfmpegEncoder {
+    exe: PathBuf,
+    settings: EncodeSettings,
+    /// Input frame size, fixed by the first frame.
+    input: Option<(u32, u32)>,
     child: Option<Child>,
     stdin: Option<ChildStdin>,
     stderr: Arc<Mutex<Vec<u8>>>,
@@ -234,14 +275,29 @@ pub struct FfmpegEncoder {
 }
 
 impl FfmpegEncoder {
-    /// Starts ffmpeg writing to `output` (parent folder is created).
+    /// Prepares to write `output` (parent folder is created now); ffmpeg
+    /// itself starts with the first frame.
     pub fn start(exe: &Path, output: &Path, s: &EncodeSettings) -> AppResult<FfmpegEncoder> {
         if let Some(parent) = output.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent).map_err(|err| write_error(parent, &err))?;
         }
-        let mut cmd = Command::new(exe);
-        cmd.args(ffmpeg_args(s))
-            .arg(output)
+        Ok(FfmpegEncoder {
+            exe: exe.to_path_buf(),
+            settings: s.clone(),
+            input: None,
+            child: None,
+            stdin: None,
+            stderr: Arc::new(Mutex::new(Vec::new())),
+            stderr_reader: None,
+            output: output.to_path_buf(),
+        })
+    }
+
+    fn spawn(&mut self, width: u32, height: u32) -> AppResult<()> {
+        let (exe, output) = (self.exe.clone(), self.output.clone());
+        let mut cmd = Command::new(&exe);
+        cmd.args(ffmpeg_args(&self.settings, width, height))
+            .arg(&output)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
@@ -273,14 +329,13 @@ impl FfmpegEncoder {
                 }
             })
         });
-        tracing::info!(output = %output.display(), "ffmpeg started");
-        Ok(FfmpegEncoder {
-            child: Some(child),
-            stdin,
-            stderr,
-            stderr_reader,
-            output: output.to_path_buf(),
-        })
+        tracing::info!(output = %output.display(), width, height, "ffmpeg started");
+        self.input = Some((width, height));
+        self.child = Some(child);
+        self.stdin = stdin;
+        self.stderr = stderr;
+        self.stderr_reader = stderr_reader;
+        Ok(())
     }
 
     fn stderr_tail(&self) -> String {
@@ -314,10 +369,20 @@ impl FfmpegEncoder {
     }
 }
 
-impl FrameSink for FfmpegEncoder {
-    fn push(&mut self, _index: u32, png: &[u8]) -> AppResult<()> {
+impl VideoSink for FfmpegEncoder {
+    fn push(&mut self, _index: u32, width: u32, height: u32, rgba: &[u8]) -> AppResult<()> {
+        match self.input {
+            None => self.spawn(width, height)?,
+            Some(size) if size != (width, height) => {
+                return Err(self.fail(&format!(
+                    "frame size changed from {}x{} to {width}x{height}",
+                    size.0, size.1
+                )));
+            }
+            Some(_) => {}
+        }
         let result = match self.stdin.as_mut() {
-            Some(stdin) => stdin.write_all(png),
+            Some(stdin) => stdin.write_all(rgba),
             None => return Err(self.fail("encoder already closed")),
         };
         result.map_err(|err| self.fail(&format!("ffmpeg stopped accepting frames ({err})")))
@@ -351,20 +416,24 @@ impl Drop for FfmpegEncoder {
 }
 
 /// ffmpeg arguments (without the output path, which comes last).
-fn ffmpeg_args(s: &EncodeSettings) -> Vec<String> {
+/// `width`×`height` is the size of the incoming frames.
+fn ffmpeg_args(s: &EncodeSettings, width: u32, height: u32) -> Vec<String> {
     let fps = s.fps.to_string();
+    let input_size = format!("{width}x{height}");
     let mut a: Vec<String> = [
         "-hide_banner",
         "-loglevel",
         "error",
         "-y",
-        // Input: a stream of PNG images on stdin at the target frame rate.
+        // Input: raw RGBA frames on stdin at the target frame rate.
         "-f",
-        "image2pipe",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        "-s",
+        &input_size,
         "-framerate",
         &fps,
-        "-c:v",
-        "png",
         "-i",
         "-",
     ]
@@ -459,8 +528,8 @@ mod tests {
 
     #[test]
     fn mp4_args_scale_tag_colours_and_use_h264() {
-        let args = ffmpeg_args(&settings(OutputFormat::Mp4)).join(" ");
-        assert!(args.contains("-f image2pipe -framerate 60 -c:v png -i -"));
+        let args = ffmpeg_args(&settings(OutputFormat::Mp4), 1080, 1920).join(" ");
+        assert!(args.contains("-f rawvideo -pix_fmt rgba -s 1080x1920 -framerate 60 -i -"));
         assert!(args.contains("scale=1080:1920"));
         assert!(args.contains("out_color_matrix=bt709"));
         assert!(args.contains("libx264 -preset veryfast"));
@@ -470,7 +539,7 @@ mod tests {
     #[test]
     fn webm_uses_vp9() {
         assert!(
-            ffmpeg_args(&settings(OutputFormat::Webm))
+            ffmpeg_args(&settings(OutputFormat::Webm), 1080, 1920)
                 .join(" ")
                 .contains("libvpx-vp9")
         );
@@ -480,11 +549,48 @@ mod tests {
     fn png_sequence_writes_numbered_files_without_ffmpeg() {
         let dir = std::env::temp_dir().join(format!("sr-encoder-test-{}", std::process::id()));
         let mut sink = open_sink(&dir, &settings(OutputFormat::Png), None).unwrap();
-        sink.push(0, b"a").unwrap();
-        sink.push(12, b"b").unwrap();
+        let red = [255u8, 0, 0, 255].repeat(6);
+        sink.push(0, 3, 2, &red).unwrap();
+        sink.push(12, 3, 2, &red).unwrap();
         sink.finish().unwrap();
-        assert_eq!(std::fs::read(dir.join("frame_000012.png")).unwrap(), b"b");
+        let png = std::fs::read(dir.join("frame_000012.png")).unwrap();
+        assert_eq!(&png[1..4], b"PNG");
+        assert_eq!(
+            u32::from_be_bytes([png[16], png[17], png[18], png[19]]),
+            3,
+            "width"
+        );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn raw_frames_become_a_video_when_ffmpeg_is_installed() {
+        let Ok(exe) = find_ffmpeg(None) else {
+            eprintln!("skipped: ffmpeg not installed");
+            return;
+        };
+        let out = std::env::temp_dir().join(format!("sr-encoder-video-{}.mp4", std::process::id()));
+        let mut s = settings(OutputFormat::Mp4);
+        (s.width, s.height, s.fps) = (64, 32, 10);
+        let mut enc = FfmpegEncoder::start(&exe, &out, &s).unwrap();
+        for i in 0..5u8 {
+            let frame = [i * 50, 100, 200, 255].repeat(64 * 32);
+            enc.push(u32::from(i), 64, 32, &frame).unwrap();
+        }
+        let err = enc.push(5, 32, 32, &[0; 32 * 32 * 4]).unwrap_err();
+        assert!(
+            err.message.contains("frame size changed"),
+            "{}",
+            err.message
+        );
+
+        let mut enc = FfmpegEncoder::start(&exe, &out, &s).unwrap();
+        for i in 0..5u32 {
+            enc.push(i, 64, 32, &[128; 64 * 32 * 4]).unwrap();
+        }
+        enc.finish().unwrap();
+        assert!(std::fs::metadata(&out).unwrap().len() > 100);
+        let _ = std::fs::remove_file(&out);
     }
 
     #[test]

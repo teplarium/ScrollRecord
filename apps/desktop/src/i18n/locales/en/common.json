@@ -49,6 +49,8 @@
     "SR-4001": "A video frame couldn't be captured. Try a lower resolution.",
     "SR-5001": "ffmpeg wasn't found. It's needed for MP4 and WebM videos; PNG frames work without it.",
     "SR-5002": "The video couldn't be encoded.",
+    "SR-6001": "The cursor pack wasn't found.",
+    "SR-6002": "The cursor pack is broken and can't be used.",
     "SR-8001": "No site was chosen. Pick a site folder or a localhost address.",
     "SR-8002": "The site folder wasn't found, or it has no index.html.",
     "SR-8003": "The built-in local web server couldn't start."

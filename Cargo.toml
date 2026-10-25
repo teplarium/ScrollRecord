@@ -35,11 +35,17 @@ sr-timeline = { path = "crates/sr-timeline" }
 sr-capture = { path = "crates/sr-capture" }
 sr-encoder = { path = "crates/sr-encoder" }
 sr-render = { path = "crates/sr-render" }
+sr-cursor = { path = "crates/sr-cursor" }
+sr-compositor = { path = "crates/sr-compositor" }
 
 # External crates
 base64 = "0.23"
 clap = { version = "4", features = ["derive"] }
 percent-encoding = "2"
+# PNG decode/encode for compositing (frames from the browser, PNG sequence output).
+png = "0.18"
+# SVG cursors → pixels. No default features: no text/fonts, no system access.
+resvg = { version = "0.49", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }

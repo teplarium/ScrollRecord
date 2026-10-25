@@ -15,9 +15,15 @@ sr-browser.workspace = true
 sr-timeline.workspace = true
 sr-capture.workspace = true
 sr-encoder.workspace = true
+sr-cursor.workspace = true
+sr-compositor.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+# The end-to-end test reads pixels of rendered frames.
+png.workspace = true
 
 [lints]
 workspace = true

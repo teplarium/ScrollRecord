@@ -20,6 +20,7 @@ sr-browser.workspace = true
 sr-capture.workspace = true
 sr-encoder.workspace = true
 sr-render.workspace = true
+sr-cursor.workspace = true
 clap.workspace = true
 serde_json.workspace = true
 

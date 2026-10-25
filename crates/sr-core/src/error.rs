@@ -114,6 +114,12 @@ error_codes! {
     /// ffmpeg failed while encoding the video.
     EncoderFailed = "SR-5002", "Video encoding failed";
 
+    // ── Cursor ──
+    /// The cursor pack named in the scenario is neither built in nor a folder.
+    CursorPackNotFound = "SR-6001", "Cursor pack not found";
+    /// The cursor pack exists but its cursor-pack.json or an SVG is broken.
+    CursorPackInvalid = "SR-6002", "Cursor pack is invalid";
+
     // ── Site sources ──
     /// Neither the scenario nor the command line says which site to record.
     SiteNotSpecified = "SR-8001", "No site specified";

@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+- **Cursor in videos (Phase 2).** The cursor moves like a hand (pause, curved path, soft stop, small overshoot), hovers so the site really reacts, clicks with a press and a ripple, and shows a finger circle for taps on phones. Two built-in cursor packs: `classic-dark`, `classic-light`. Custom packs: a folder with `cursor-pack.json` + SVGs.
+- Buttons inside blocks that slide in are measured after they appear, so the cursor lands on them.
+- `scrollrecord validate` also checks the cursor pack and shows how many actions each device gets.
+- New error codes: SR-6001 (cursor pack not found), SR-6002 (cursor pack broken).
+
 ### Added — ready-to-use command-line package
 - Every CI run now builds `ScrollRecord-CLI-Windows` (and `-Linux`): `scrollrecord.exe`, an example site with its scenario, and launchers. Double-click `render-example.bat` to render the example, or drag your own `*.srflow.json` onto `render.bat`. The videos folder opens when done.
 - ffmpeg is also found next to `scrollrecord.exe` and right after `winget install Gyan.FFmpeg` (no new terminal needed). The "ffmpeg not found" message says how to install it.

@@ -1,0 +1,77 @@
+{
+  "format_version": 1,
+  "id": "classic-dark",
+  "name": "Classic Dark",
+  "author": "ScrollRecord contributors",
+  "license": "CC0-1.0",
+  "description": "Black cursor with a white outline, like the system default. Best on light sites.",
+  "states": {
+    "arrow": {
+      "svg": "arrow.svg",
+      "hotspot": [
+        5,
+        3
+      ],
+      "size": 32
+    },
+    "pointer": {
+      "svg": "pointer.svg",
+      "hotspot": [
+        13,
+        3
+      ],
+      "size": 32
+    },
+    "text": {
+      "svg": "text.svg",
+      "hotspot": [
+        16,
+        16
+      ],
+      "size": 32
+    },
+    "touch": {
+      "svg": "touch.svg",
+      "hotspot": [
+        24,
+        24
+      ],
+      "size": 48
+    }
+  },
+  "animations": {
+    "click": {
+      "keyframes": [
+        {
+          "t": 0,
+          "scale": 1
+        },
+        {
+          "t": 80,
+          "scale": 0.85
+        },
+        {
+          "t": 220,
+          "scale": 1
+        }
+      ],
+      "easing": "ease-out",
+      "effect": "ripple"
+    }
+  },
+  "effects": {
+    "ripple": {
+      "color": "#1A1A1A59",
+      "radius": 26,
+      "duration_ms": 450
+    },
+    "shadow": {
+      "blur": 2.5,
+      "opacity": 0.35,
+      "offset": [
+        0,
+        1
+      ]
+    }
+  }
+}

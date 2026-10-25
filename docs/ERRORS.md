@@ -157,6 +157,19 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 - **Common causes:** your ffmpeg build lacks the codec (H.264 needs `libx264`, WebM needs `libvpx-vp9`); disk full.
 - **What to do:** check `ffmpeg -encoders` for the codec, or install a full build. As a fallback, render to `"format": "png"`.
 
+## SR-6001
+
+**Cursor pack not found.** `defaults.cursor.pack` is neither a built-in pack (`classic-dark`, `classic-light`) nor a folder with a `cursor-pack.json`. Folder paths are relative to the scenario file.
+
+- **What to do:** check the spelling, or the `path` parameter. Zipped packs (`.srcursor` files) are planned for later: unzip it into a folder for now.
+
+## SR-6002
+
+**Cursor pack is invalid.** The pack was found, but `cursor-pack.json` doesn't match the format (HANDOFF §8.3) or one of its SVG files can't be drawn. The message names the file and the problem.
+
+- **Common causes:** a typo in a field name; a missing `arrow` state; an SVG that links to an outside file (not allowed, for safety); an SVG without a size (`viewBox` or `width`/`height`).
+- **What to do:** fix the named file, or switch back to a built-in pack.
+
 ## SR-8001
 
 **No site specified.** The scenario has no `meta.site` and no `--site` was given on the command line.

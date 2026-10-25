@@ -3,6 +3,10 @@
 //! Why this layer: the renderer should say "open this URL as an iPhone",
 //! "measure these blocks", "next frame", not juggle CDP messages. Each method
 //! below is one clear step with its own error code.
+//! Pointer: real hover/click/tap events go through CDP `Input.*`, which
+//! updates `:hover` synchronously. A scroll alone would update hover only on
+//! the browser's next real frame (timing-dependent), so on "live" frames
+//! the pointer position is sent again after every scroll (ADR 0003).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -11,12 +15,12 @@ use std::time::{Duration, Instant};
 use base64::Engine as _;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use sr_core::flow::Locator;
+use sr_core::flow::{CursorKind, MeasureItem};
 use sr_core::{AppError, AppResult, ErrorCode};
 
-use crate::FrameDriver;
 use crate::cdp::Cdp;
 use crate::process::{BrowserProcess, LaunchOptions};
+use crate::{FrameDriver, PointerInput, StepResult};
 
 /// The page runtime (time control, prepare, measure). See `js/runtime.js`.
 const RUNTIME_JS: &str = include_str!("../js/runtime.js");
@@ -77,6 +81,7 @@ impl Browser {
             browser: self,
             session,
             target_id,
+            pointer: PointerState::default(),
         };
         page.call("Page.enable", json!({}))?;
         page.freeze_animation_clock()?;
@@ -172,6 +177,10 @@ pub enum BlockMeasure {
         top: f64,
         /// Height.
         height: f64,
+        /// Left edge in page coordinates.
+        left: f64,
+        /// Width.
+        width: f64,
         /// Index of the locator that matched.
         matched: usize,
     },
@@ -193,7 +202,20 @@ pub struct Page<'b> {
     browser: &'b mut Browser,
     session: String,
     target_id: String,
+    pointer: PointerState,
 }
+
+/// What the browser currently believes about the mouse.
+#[derive(Debug, Default, Clone, Copy)]
+struct PointerState {
+    /// The page has been told a pointer position inside the viewport.
+    inside: bool,
+    /// Left button is down (moves must say so, or a drag/click breaks).
+    pressed: bool,
+}
+
+/// Far outside the viewport: moving here clears `:hover` everywhere.
+const OUTSIDE: f64 = -100.0;
 
 impl Page<'_> {
     fn call(&mut self, method: &str, params: Value) -> AppResult<Value> {
@@ -283,11 +305,13 @@ impl Page<'_> {
         })
     }
 
-    /// Measures blocks. `blocks` = (block id, locators in priority order).
-    pub fn measure(&mut self, blocks: &[(String, Vec<Locator>)]) -> AppResult<Measurements> {
-        let arg: Vec<Value> = blocks
+    /// Measures blocks and action targets (page coordinates, CSS px).
+    /// Items with `within` are searched inside that block first; it must be
+    /// listed earlier in `items`.
+    pub fn measure(&mut self, items: &[MeasureItem]) -> AppResult<Measurements> {
+        let arg: Vec<Value> = items
             .iter()
-            .map(|(id, locators)| json!({ "id": id, "locators": locators }))
+            .map(|m| json!({ "id": m.id, "locators": m.locators, "within": m.within }))
             .collect();
         let raw = self.eval(&format!("__sr.measure({})", Value::Array(arg)))?;
         serde_json::from_value(raw).map_err(|err| {
@@ -296,6 +320,77 @@ impl Page<'_> {
                 format!("measure result: {err}"),
             )
         })
+    }
+
+    /// Probe: scrolls to `scroll_y`, lets reveal effects finish (at most
+    /// `max_ms` of page time), then measures `items`.
+    ///
+    /// Why: buttons inside a block that slides in are measured at their
+    /// final place, so the cursor lands on them. This changes the page, so
+    /// reload it ([`Page::navigate`]) before recording.
+    pub fn probe(
+        &mut self,
+        scroll_y: f64,
+        max_ms: f64,
+        items: &[MeasureItem],
+    ) -> AppResult<Measurements> {
+        self.eval(&format!("__sr.settleAt({scroll_y}, {max_ms})"))?;
+        self.measure(items)
+    }
+
+    // ── Pointer input ───────────────────────────────────────────────────────
+    fn mouse(&mut self, kind: &str, x: f64, y: f64, button: &str, buttons: u8) -> AppResult<()> {
+        self.call(
+            "Input.dispatchMouseEvent",
+            json!({ "type": kind, "x": x, "y": y, "button": button, "buttons": buttons, "clickCount": 1 }),
+        )?;
+        Ok(())
+    }
+
+    fn touch(&mut self, kind: &str, x: f64, y: f64) -> AppResult<()> {
+        let points = if kind == "touchEnd" {
+            json!([])
+        } else {
+            json!([{ "x": x, "y": y }])
+        };
+        self.call(
+            "Input.dispatchTouchEvent",
+            json!({ "type": kind, "touchPoints": points }),
+        )?;
+        Ok(())
+    }
+
+    /// Sends this frame's pointer input: the position (when live), then
+    /// presses/releases. Returns whether anything was sent.
+    fn send_pointer(&mut self, p: &PointerInput) -> AppResult<bool> {
+        let mut sent = false;
+        let buttons = u8::from(self.pointer.pressed);
+        if p.live {
+            self.mouse("mouseMoved", p.x, p.y, "none", buttons)?;
+            self.pointer.inside = true;
+            sent = true;
+        } else if self.pointer.inside {
+            // Leaving live mode: take the mouse off the page so nothing stays hovered.
+            self.mouse("mouseMoved", OUTSIDE, OUTSIDE, "none", 0)?;
+            self.pointer = PointerState::default();
+            sent = true;
+        }
+        for e in &p.events {
+            match (e.touch, e.down) {
+                (true, true) => self.touch("touchStart", e.x, e.y)?,
+                (true, false) => self.touch("touchEnd", e.x, e.y)?,
+                (false, true) => {
+                    self.mouse("mousePressed", e.x, e.y, "left", 1)?;
+                    self.pointer.pressed = true;
+                }
+                (false, false) => {
+                    self.mouse("mouseReleased", e.x, e.y, "left", 0)?;
+                    self.pointer.pressed = false;
+                }
+            }
+            sent = true;
+        }
+        Ok(sent)
     }
 
     // ── Script evaluation ───────────────────────────────────────────────────
@@ -339,9 +434,36 @@ impl Page<'_> {
 
 // ── Frame-by-frame control ──────────────────────────────────────────────────
 impl FrameDriver for Page<'_> {
-    fn step(&mut self, scroll_y: f64, advance_ms: f64) -> AppResult<f64> {
+    fn step(
+        &mut self,
+        scroll_y: f64,
+        advance_ms: f64,
+        pointer: &PointerInput,
+    ) -> AppResult<StepResult> {
+        // ── 1. Scroll and move page time ──
         let applied = self.eval(&format!("__sr.frame({scroll_y}, {advance_ms})"))?;
-        Ok(applied.as_f64().unwrap_or(scroll_y))
+        let scroll_y = applied.as_f64().unwrap_or(scroll_y);
+
+        // ── 2. Pointer events at the new scroll position, then let hover
+        //       transitions start at this frame's time ──
+        let sync = self.send_pointer(pointer)?;
+        let mut cursor_kind = None;
+        if sync || pointer.detect_kind {
+            let kind = self.eval(&format!(
+                "__sr.pointer({}, {}, {sync}, {})",
+                pointer.x, pointer.y, pointer.detect_kind
+            ))?;
+            cursor_kind = match kind.as_str() {
+                Some("pointer") => Some(CursorKind::Pointer),
+                Some("text") => Some(CursorKind::Text),
+                Some("arrow") => Some(CursorKind::Arrow),
+                _ => None,
+            };
+        }
+        Ok(StepResult {
+            scroll_y,
+            cursor_kind,
+        })
     }
 
     fn capture_png(&mut self) -> AppResult<Vec<u8>> {

@@ -9,11 +9,11 @@
 //!          collected and reported together (`SR-2002`) with node ids, so the
 //!          editor can highlight every broken shape at once.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use super::{
-    Align, Anchor, Fit, Flow, Frame, Locator, Node, NodeOverride, OutputGeometry, Page, Target,
-    Viewport,
+    Action, ActionKind, Align, Anchor, CursorSettings, Fit, Flow, Frame, Locator, Node,
+    NodeOverride, OutputGeometry, Page, ScrollCursor, Target, Viewport,
 };
 use crate::easing::Easing;
 use crate::error::{AppError, AppResult, ErrorCode};
@@ -52,10 +52,41 @@ pub struct PlanBlock {
     pub align: Align,
     /// Extra shift in CSS px.
     pub offset_px: f64,
-    /// Pause after arriving (0 = pass through).
+    /// Pause after arriving (0 = pass through). Actions extend it if needed.
     pub hold_ms: u32,
     /// Move that arrives at this block.
     pub arrive: ScrollMove,
+    /// Cursor behaviour during that move.
+    pub arrive_cursor: ScrollCursor,
+    /// Actions for this target, in order (filtered by only/except and device).
+    pub actions: Vec<PlanAction>,
+}
+
+/// An action of a block, with its position in the block's `actions` list.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlanAction {
+    /// Index in the block's original `actions` list (used in ids and messages).
+    pub index: usize,
+    /// The action.
+    pub action: Action,
+}
+
+impl PlanAction {
+    /// Measurement id of this action's target element: `"<block>#<index>"`.
+    pub fn measure_id(block: &str, index: usize) -> String {
+        format!("{block}#{index}")
+    }
+}
+
+/// One element to measure on the page.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MeasureItem {
+    /// Id the result is stored under (block id, or `block#n` for action targets).
+    pub id: String,
+    /// Locators in priority order.
+    pub locators: Vec<Locator>,
+    /// Search inside this block's element first (action targets).
+    pub within: Option<String>,
 }
 
 /// Where and how the recording ends.
@@ -69,6 +100,8 @@ pub struct PlanEnd {
     pub hold_ms: u32,
     /// Move that arrives at the final position.
     pub arrive: ScrollMove,
+    /// Cursor behaviour during that move.
+    pub arrive_cursor: ScrollCursor,
 }
 
 /// Everything one target needs to render, in order.
@@ -88,9 +121,13 @@ pub struct FlowPlan {
     pub blocks: Vec<PlanBlock>,
     /// End.
     pub end: PlanEnd,
-    /// Blocks to measure on the page: the block stops plus blocks used
-    /// only as start/end anchors (id → locators).
-    pub measure: BTreeMap<String, Vec<Locator>>,
+    /// What to measure on the page: the block stops, blocks used only as
+    /// start/end anchors, and the target elements of actions.
+    pub measure: Vec<MeasureItem>,
+    /// Cursor settings.
+    pub cursor: CursorSettings,
+    /// Touch device: taps instead of a mouse cursor.
+    pub touch: bool,
     /// Non-fatal notes (ignored phase-2 settings, unconnected nodes…).
     pub warnings: Vec<String>,
 }
@@ -136,7 +173,7 @@ impl Flow {
         self.check_targets(r);
         let pages = self.check_pages(r);
         let nodes = self.check_nodes(r, &pages);
-        self.check_phase_two(r);
+        self.check_cursor_and_actions(r);
         let path = self.check_graph(r, &nodes);
         self.check_overrides(r, &nodes);
         path
@@ -422,33 +459,28 @@ impl Flow {
         }
     }
 
-    fn check_phase_two(&self, r: &mut Report) {
-        if self.defaults.cursor.is_some() {
-            r.warn("defaults.cursor is ignored until Phase 2 (cursor)");
+    fn check_cursor_and_actions(&self, r: &mut Report) {
+        if let Err(e) = self.defaults.cursor.check() {
+            r.err(format!("defaults: {e}"));
         }
         for n in &self.nodes {
-            if let Node::Block(b) = n
-                && !b.actions.is_empty()
-            {
-                r.warn(format!(
-                    "block '{}': actions are ignored until Phase 2 (cursor)",
-                    b.id
-                ));
-            }
-        }
-        for e in &self.edges {
-            if e.cursor.is_some() {
-                r.warn(format!(
-                    "arrow {} → {}: cursor is ignored until Phase 2",
-                    e.from, e.to
-                ));
+            if let Node::Block(b) = n {
+                for (i, a) in b.actions.iter().enumerate() {
+                    if let Err(e) = a.check() {
+                        r.err(format!(
+                            "block '{}': actions[{i}] ({}): {e}",
+                            b.id,
+                            a.kind_name()
+                        ));
+                    }
+                }
             }
         }
         for (key, ov) in &self.overrides {
             for (id, n) in &ov.nodes {
                 if !n.before.is_empty() {
                     r.warn(format!(
-                        "overrides '{key}' / '{id}': 'before' actions are ignored until Phase 2"
+                        "overrides '{key}' / '{id}': 'before' actions arrive with navigation (Phase 4) and are ignored for now"
                     ));
                 }
             }
@@ -484,6 +516,16 @@ impl Flow {
             .map_err(|e| AppError::new(ErrorCode::FlowInvalid, e))?;
 
         let overrides = self.overrides_for(&target);
+        let touch = viewport.has_touch();
+        let preset = target.viewport.preset_name();
+        let mut warnings = r.warnings;
+        let cursor_into = |id: &str| -> ScrollCursor {
+            self.edges
+                .iter()
+                .find(|e| e.to == id)
+                .and_then(|e| e.cursor)
+                .unwrap_or_default()
+        };
         let edge_into = |id: &str| -> ScrollMove {
             let spec = self
                 .edges
@@ -526,6 +568,27 @@ impl Flow {
                         }
                         _ => page_id = Some(&b.page),
                     }
+                    // Actions for this device. Touch screens have no hover and
+                    // no visible pointer, so only clicks (taps) and waits remain.
+                    let mut actions = Vec::new();
+                    for (index, action) in b.actions.iter().enumerate() {
+                        if !action.applies_to(&target.id, preset) {
+                            continue;
+                        }
+                        if touch && matches!(action.kind, ActionKind::Hover | ActionKind::Move) {
+                            warnings.push(format!(
+                                "block '{}': actions[{index}] ({}) is skipped on touch device '{}'",
+                                b.id,
+                                action.kind_name(),
+                                target.id
+                            ));
+                            continue;
+                        }
+                        actions.push(PlanAction {
+                            index,
+                            action: action.clone(),
+                        });
+                    }
                     blocks.push(PlanBlock {
                         id: b.id.clone(),
                         target: b.target.clone(),
@@ -533,6 +596,8 @@ impl Flow {
                         offset_px: ov.offset_px.unwrap_or(b.offset_px),
                         hold_ms: ov.hold_ms.or(b.hold_ms).unwrap_or(self.defaults.hold_ms),
                         arrive: edge_into(&b.id),
+                        arrive_cursor: cursor_into(&b.id),
+                        actions,
                     });
                 }
                 Node::Navigate(_) => return Err(AppError::not_implemented("navigate", 4)),
@@ -542,6 +607,7 @@ impl Flow {
                         at: e.at.clone(),
                         hold_ms: e.hold_ms,
                         arrive: edge_into(&e.id),
+                        arrive_cursor: cursor_into(&e.id),
                     });
                 }
             }
@@ -568,16 +634,30 @@ impl Flow {
             .cloned()
             .ok_or_else(|| AppError::new(ErrorCode::Internal, "page vanished"))?;
 
-        // Measure only what this target needs: its blocks plus anchor blocks.
-        let mut measure: BTreeMap<String, Vec<Locator>> = blocks
-            .iter()
-            .map(|b| (b.id.clone(), b.target.clone()))
-            .collect();
+        // Measure only what this target needs: its blocks, anchor blocks and
+        // the targets of its actions.
+        let mut measure: Vec<MeasureItem> = Vec::new();
+        let mut add = |id: String, locators: Vec<Locator>, within: Option<String>| {
+            if !measure.iter().any(|m| m.id == id) {
+                measure.push(MeasureItem {
+                    id,
+                    locators,
+                    within,
+                });
+            }
+        };
+        for b in &blocks {
+            add(b.id.clone(), b.target.clone(), None);
+            for a in &b.actions {
+                if !a.action.target.is_empty() {
+                    let id = PlanAction::measure_id(&b.id, a.index);
+                    add(id, a.action.target.clone(), Some(b.id.clone()));
+                }
+            }
+        }
         for anchor in std::iter::once(&start.at).chain(end.at.as_ref()) {
             if let Some(Node::Block(b)) = self.node(&anchor.block) {
-                measure
-                    .entry(b.id.clone())
-                    .or_insert_with(|| b.target.clone());
+                add(b.id.clone(), b.target.clone(), None);
             }
         }
 
@@ -590,7 +670,9 @@ impl Flow {
             blocks,
             end,
             measure,
-            warnings: r.warnings,
+            cursor: self.defaults.cursor.clone(),
+            touch,
+            warnings,
         })
     }
 
@@ -661,7 +743,7 @@ mod tests {
             Some(AnchorPoint::Bottom)
         );
         assert!(
-            plan.measure.contains_key("footer"),
+            plan.measure.iter().any(|m| m.id == "footer"),
             "anchor-only blocks are measured too"
         );
         assert_eq!(
@@ -708,6 +790,55 @@ mod tests {
         let err = flow(&looped).validate().unwrap_err();
         assert!(
             err.message.contains("incoming arrows") || err.message.contains("loop"),
+            "{}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn actions_are_filtered_per_device_and_measured() {
+        let with_actions = BASE.replace(
+            r#"{ "id": "a", "kind": "block", "page": "home", "target": [{ "sr": "a" }] }"#,
+            r#"{ "id": "a", "kind": "block", "page": "home", "target": [{ "sr": "a" }], "actions": [
+                { "do": "hover", "target": [{ "sr": "btn" }] },
+                { "do": "click", "target": [{ "sr": "btn" }], "only": ["mobile"] },
+                { "do": "wait", "duration_ms": 200 }
+            ] }"#,
+        );
+        let flow = flow(&with_actions);
+        let desktop = flow.plan("desktop").unwrap();
+        let kinds: Vec<_> = desktop.blocks[0].actions.iter().map(|a| a.index).collect();
+        assert_eq!(kinds, [0, 2], "click is mobile-only");
+        assert!(
+            desktop
+                .measure
+                .iter()
+                .any(|m| m.id == "a#0" && m.within.as_deref() == Some("a"))
+        );
+        assert!(!desktop.touch);
+
+        let mobile = flow.plan("mobile").unwrap();
+        assert!(mobile.touch);
+        let kinds: Vec<_> = mobile.blocks[0].actions.iter().map(|a| a.index).collect();
+        assert_eq!(kinds, [1, 2], "hover is skipped on touch screens");
+        assert!(
+            mobile
+                .warnings
+                .iter()
+                .any(|w| w.contains("skipped on touch"))
+        );
+    }
+
+    #[test]
+    fn invalid_actions_are_reported() {
+        let bad = BASE.replace(
+            r#"{ "id": "a", "kind": "block", "page": "home", "target": [{ "sr": "a" }] }"#,
+            r#"{ "id": "a", "kind": "block", "page": "home", "target": [{ "sr": "a" }], "actions": [{ "do": "click" }] }"#,
+        );
+        let err = flow(&bad).validate().unwrap_err();
+        assert!(
+            err.message
+                .contains("block 'a': actions[0] (click): 'click' needs a target"),
             "{}",
             err.message
         );

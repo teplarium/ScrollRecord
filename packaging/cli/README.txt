@@ -26,6 +26,15 @@ YOUR OWN SITE
      Linux:   ./render.sh path/to/file.srflow.json
      Videos appear in a "renders" folder next to the scenario file.
 
+  5. Cursor (optional): add "actions" to a block, for example
+       "actions": [ { "do": "hover", "target": [{ "text": "Buy now" }] },
+                    { "do": "click", "target": [{ "text": "Buy now" }] } ]
+     Hover makes the site react; a click is only shown (nothing is really
+     clicked) unless you add "mode": "real". On phones clicks become taps.
+     Cursor look: "defaults": { "cursor": { "pack": "classic-light" } }
+     (classic-dark is for light sites, classic-light for dark ones).
+     The example scenario shows all of this.
+
   Check a scenario without rendering:
      scrollrecord validate path/to/file.srflow.json
   See which browser and ffmpeg will be used:

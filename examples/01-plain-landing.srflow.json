@@ -10,12 +10,22 @@
   ],
   "defaults": {
     "scroll": { "speed_px_s": 1000, "easing": "ease-in-out" },
-    "hold_ms": 1200
+    "hold_ms": 1200,
+    "cursor": { "pack": "classic-dark", "seed": 7 }
   },
   "pages": [{ "id": "home", "url": "/" }],
   "nodes": [
     { "id": "start", "kind": "start", "at": { "block": "hero", "anchor": "top" } },
-    { "id": "hero", "kind": "block", "page": "home", "target": [{ "sr": "hero" }], "hold_ms": 1500 },
+    {
+      "id": "hero",
+      "kind": "block",
+      "page": "home",
+      "target": [{ "sr": "hero" }],
+      "hold_ms": 1500,
+      "actions": [
+        { "do": "hover", "target": [{ "text": "Get started" }], "duration_ms": 900, "only": ["desktop"] }
+      ]
+    },
     { "id": "features", "kind": "block", "page": "home", "target": [{ "sr": "features" }], "hold_ms": 0 },
     { "id": "steps", "kind": "block", "page": "home", "target": [{ "sr": "steps" }], "hold_ms": 1200 },
     { "id": "quote", "kind": "block", "page": "home", "target": [{ "sr": "quote" }], "align": "center", "hold_ms": 0 },
@@ -25,7 +35,11 @@
       "page": "home",
       "target": [{ "sr": "pricing" }, { "css": "#pricing" }],
       "align": "center",
-      "hold_ms": 1500
+      "hold_ms": 1500,
+      "actions": [
+        { "do": "hover", "target": [{ "css": ".plan--pro" }], "duration_ms": 500, "only": ["desktop"] },
+        { "do": "click", "target": [{ "text": "Choose Pro" }], "delay_ms": 150 }
+      ]
     },
     { "id": "footer", "kind": "block", "page": "home", "target": [{ "sr": "footer" }] },
     { "id": "end", "kind": "end", "at": { "block": "footer", "anchor": "bottom" }, "hold_ms": 800 }
@@ -36,7 +50,7 @@
     { "from": "features", "to": "steps" },
     { "from": "steps", "to": "quote" },
     { "from": "quote", "to": "pricing" },
-    { "from": "pricing", "to": "end", "scroll": { "duration_ms": 1200 } }
+    { "from": "pricing", "to": "end", "scroll": { "duration_ms": 1200 }, "cursor": "hide" }
   ],
   "overrides": {
     "iphone-15": {

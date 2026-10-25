@@ -12,6 +12,8 @@
 //!          with a warning.
 //! See also: `path.rs` (validation and the ordered path), `target.rs`.
 
+mod action;
+mod cursor;
 mod locator;
 mod path;
 mod target;
@@ -20,8 +22,10 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+pub use action::{Action, ActionKind, Point, PointerMode};
+pub use cursor::{CursorKind, CursorSettings, DEFAULT_CURSOR_PACK, ScrollCursor};
 pub use locator::Locator;
-pub use path::{FlowPlan, PlanBlock, PlanEnd, PlanStart, ScrollMove};
+pub use path::{FlowPlan, MeasureItem, PlanAction, PlanBlock, PlanEnd, PlanStart, ScrollMove};
 pub use target::{
     Aspect, Fit, Frame, OutputFormat, OutputGeometry, Resolution, Target, Viewport, ViewportRef,
 };
@@ -113,9 +117,9 @@ pub struct Defaults {
     /// Default pause on a block, in ms (0 = scroll through without stopping).
     #[serde(default = "Defaults::default_hold")]
     pub hold_ms: u32,
-    /// Cursor settings (Phase 2).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<serde_json::Value>,
+    /// Cursor look and behaviour.
+    #[serde(default)]
+    pub cursor: CursorSettings,
 }
 
 impl Defaults {
@@ -142,7 +146,7 @@ impl Default for Defaults {
         Self {
             scroll: Self::default_scroll(),
             hold_ms: Self::HOLD_MS,
-            cursor: None,
+            cursor: CursorSettings::default(),
         }
     }
 }
@@ -261,9 +265,9 @@ pub struct BlockNode {
     /// Pause on this block. `0` = scroll through without stopping.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hold_ms: Option<u32>,
-    /// Interactions inside the block (Phase 2).
+    /// Cursor steps on this block (hover, click, move, wait), in order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub actions: Vec<serde_json::Value>,
+    pub actions: Vec<Action>,
 }
 
 /// Navigation to another page (Phase 4).
@@ -357,9 +361,9 @@ pub struct Edge {
     /// Scroll move along this arrow.
     #[serde(default)]
     pub scroll: ScrollSpec,
-    /// Cursor behaviour during the move (Phase 2).
+    /// Cursor during the move: `still` (default), `follow` or `hide`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cursor: Option<serde_json::Value>,
+    pub cursor: Option<ScrollCursor>,
 }
 
 /// Per-device changes.

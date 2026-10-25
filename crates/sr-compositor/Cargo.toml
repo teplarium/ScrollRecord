@@ -1,0 +1,19 @@
+[package]
+name = "sr-compositor"
+description = "ScrollRecord compositor: draws the cursor, clicks and touch indicators onto captured frames."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sr-core.workspace = true
+sr-cursor.workspace = true
+sr-timeline.workspace = true
+# Decodes the browser's PNG screenshots into pixels we can draw on.
+png.workspace = true
+
+[lints]
+workspace = true

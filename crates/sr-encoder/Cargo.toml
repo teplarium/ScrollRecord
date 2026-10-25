@@ -1,6 +1,6 @@
 [package]
 name = "sr-encoder"
-description = "ScrollRecord encoder: turns captured frames into MP4/WebM via ffmpeg, or a PNG folder."
+description = "ScrollRecord encoder: turns finished RGBA frames into MP4/WebM via ffmpeg, or a PNG folder."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,9 @@ authors.workspace = true
 
 [dependencies]
 sr-core.workspace = true
-sr-capture.workspace = true
 tracing.workspace = true
+# Writes PNG-sequence frames (pixels come in raw after the cursor is drawn).
+png.workspace = true
 
 [lints]
 workspace = true

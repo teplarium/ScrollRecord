@@ -6,4 +6,4 @@
  * The string form is what users see, what the UI translates and what
  * appears in logs. Never change or reuse an existing code — add a new one.
  */
-export type ErrorCode = "SR-0001" | "SR-0002" | "SR-0003" | "SR-0101" | "SR-1001" | "SR-1002" | "SR-2001" | "SR-2002" | "SR-2003" | "SR-2004" | "SR-2101" | "SR-2102" | "SR-3001" | "SR-3002" | "SR-3003" | "SR-3004" | "SR-3005" | "SR-4001" | "SR-5001" | "SR-5002" | "SR-8001" | "SR-8002" | "SR-8003";
+export type ErrorCode = "SR-0001" | "SR-0002" | "SR-0003" | "SR-0101" | "SR-1001" | "SR-1002" | "SR-2001" | "SR-2002" | "SR-2003" | "SR-2004" | "SR-2101" | "SR-2102" | "SR-3001" | "SR-3002" | "SR-3003" | "SR-3004" | "SR-3005" | "SR-4001" | "SR-5001" | "SR-5002" | "SR-6001" | "SR-6002" | "SR-8001" | "SR-8002" | "SR-8003";
