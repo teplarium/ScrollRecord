@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Fixture 04 — Lenis smooth scroll (+ GSAP ScrollTrigger, the usual pairing).
+  Purpose: smooth-scroll libraries take over scrolling. Lenis keeps the
+  browser's native scroll but runs its own animation loop and reports
+  scroll position, direction and *velocity* to the page. Capture must keep
+  those values right in every frame.
+  Covers:
+    hero      Lenis started with GSAP's ticker driving lenis.raf (the setup
+              from the Lenis README), ScrollTrigger updated on Lenis scroll
+    speed     an element skewed by Lenis velocity (popular "speed" effect)
+              and a header that hides while scrolling down (direction)
+    parallax  a ScrollTrigger scrub parallax layer
+  Libraries: vendor/ (Lenis 1.3 — MIT; GSAP 3.15 — own licence, see
+  vendor/README.md).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fixture 04 — Lenis</title>
+    <link rel="stylesheet" href="vendor/lenis.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" id="topbar">Lenis fixture</header>
+
+    <section class="hero" data-sr="hero">
+      <h1>Smooth by default</h1>
+    </section>
+
+    <section class="speed" data-sr="speed">
+      <div class="skew" id="skew">speed</div>
+    </section>
+
+    <section class="parallax" data-sr="parallax">
+      <div class="layer" id="layer"></div>
+    </section>
+
+    <footer class="footer" data-sr="footer">Fixture 04 · Lenis</footer>
+
+    <script src="vendor/lenis.min.js"></script>
+    <script src="vendor/gsap.min.js"></script>
+    <script src="vendor/ScrollTrigger.min.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>

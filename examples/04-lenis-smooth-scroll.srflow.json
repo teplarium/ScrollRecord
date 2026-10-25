@@ -1,0 +1,121 @@
+{
+  "format_version": 1,
+  "meta": {
+    "name": "Fixture 04 — Lenis",
+    "site": "../tests/fixtures/sites/04-lenis-smooth-scroll"
+  },
+  "targets": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "aspect": "16:9",
+      "resolution": "1080p",
+      "fps": 60
+    }
+  ],
+  "defaults": {
+    "scroll": {
+      "speed_px_s": 900,
+      "easing": "ease-in-out"
+    },
+    "hold_ms": 1000,
+    "cursor": {
+      "pack": "classic-dark",
+      "seed": 11
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "/"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "start",
+      "at": {
+        "block": "hero",
+        "anchor": "top"
+      }
+    },
+    {
+      "id": "hero",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "hero"
+        }
+      ],
+      "hold_ms": 800
+    },
+    {
+      "id": "speed",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "speed"
+        }
+      ],
+      "hold_ms": 1000
+    },
+    {
+      "id": "parallax",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "parallax"
+        }
+      ],
+      "hold_ms": 600
+    },
+    {
+      "id": "footer",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "footer"
+        }
+      ],
+      "hold_ms": 0
+    },
+    {
+      "id": "end",
+      "kind": "end",
+      "at": {
+        "block": "footer",
+        "anchor": "bottom"
+      },
+      "hold_ms": 800
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "hero"
+    },
+    {
+      "from": "hero",
+      "to": "speed"
+    },
+    {
+      "from": "speed",
+      "to": "parallax"
+    },
+    {
+      "from": "parallax",
+      "to": "footer"
+    },
+    {
+      "from": "footer",
+      "to": "end"
+    }
+  ]
+}

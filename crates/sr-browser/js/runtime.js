@@ -10,8 +10,10 @@
 //          is rendered completely, no matter how slow the machine is
 //          (HANDOFF §7.3). Same scenario → same video.
 // What is virtualised: setTimeout/setInterval, requestAnimationFrame,
-//          performance.now, Date, and all CSS/Web animations (paused and
-//          seeked via the Web Animations API).
+//          requestIdleCallback, performance.now, Date, and all CSS/Web
+//          animations (moved forward via the Web Animations API). Work that
+//          frameworks schedule with MessageChannel (React) is waited for
+//          inside the frame.
 // Rules:   this script must never break a page. Every page callback runs in
 //          try/catch; helpers use the *real* timers saved below.
 (() => {
@@ -21,7 +23,10 @@
   const realSetTimeout = window.setTimeout.bind(window);
   const realRequestFrame = window.requestAnimationFrame.bind(window);
   const RealDate = window.Date;
+  const realFetch = window.fetch.bind(window); // sites sometimes wrap fetch
   const epoch = RealDate.now();
+  const realWait = (ms) => new Promise((resolve) => realSetTimeout(resolve, ms));
+  const withTimeout = (promise, ms) => Promise.race([promise, realWait(ms)]);
 
   // ── Virtual clock ─────────────────────────────────────────────────────────
   // `now` = milliseconds of page time since the page started. It only moves
@@ -32,16 +37,25 @@
   let nextTimerId = 1;
   const frameCallbacks = new Map();
   let nextFrameId = 1;
+  const idleCallbacks = new Map();
+  let nextIdleId = 1;
+
+  // Timers scheduled from inside timers more than 5 levels deep wait at
+  // least 4 ms, like in every browser (HTML spec). Without this, a
+  // `setTimeout(loop, 0)` loop would spin without end inside one frame.
+  let nesting = 0;
+  const clampDelay = (delay, level) => Math.max(level > 5 ? 4 : 0, Number(delay) || 0);
 
   window.setTimeout = function (fn, delay, ...args) {
     const id = nextTimerId++;
-    timers.set(id, { fn, args, at: now + Math.max(0, Number(delay) || 0), every: 0 });
+    const level = nesting + 1;
+    timers.set(id, { fn, args, at: now + clampDelay(delay, level), every: 0, level });
     return id;
   };
   window.setInterval = function (fn, delay, ...args) {
-    const every = Math.max(1, Number(delay) || 0);
+    const every = Math.max(4, Number(delay) || 0);
     const id = nextTimerId++;
-    timers.set(id, { fn, args, at: now + every, every });
+    timers.set(id, { fn, args, at: now + every, every, level: nesting + 1 });
     return id;
   };
   window.clearTimeout = window.clearInterval = function (id) {
@@ -55,6 +69,20 @@
   window.cancelAnimationFrame = function (id) {
     frameCallbacks.delete(id);
   };
+  // Idle callbacks run once per frame, after the animation-frame callbacks.
+  // Real browsers run them "whenever the machine is idle", i.e. at random
+  // moments; deferred work (lazy widgets, Astro `client:idle`) would then
+  // show up in a different frame on every render.
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback = function (cb) {
+      const id = nextIdleId++;
+      idleCallbacks.set(id, cb);
+      return id;
+    };
+    window.cancelIdleCallback = function (id) {
+      idleCallbacks.delete(id);
+    };
+  }
   performance.now = function () {
     return now;
   };
@@ -79,7 +107,8 @@
     }
   }
 
-  // Runs every timer due up to `target`, in time order, then rAF callbacks.
+  // Runs every timer due up to `target` in time order, then animation-frame
+  // callbacks, then idle callbacks.
   function advance(ms) {
     const target = now + Math.max(0, ms);
     for (let guard = 0; guard < 100000; guard++) {
@@ -95,13 +124,82 @@
       now = Math.max(now, due.at);
       if (due.every) due.at += due.every;
       else timers.delete(dueId);
+      nesting = due.level;
       safely(due.fn, ...due.args);
+      nesting = 0;
     }
     now = target;
     const callbacks = [...frameCallbacks.values()];
     frameCallbacks.clear();
     for (const cb of callbacks) safely(cb, now);
+    const idle = [...idleCallbacks.values()];
+    idleCallbacks.clear();
+    for (const cb of idle) {
+      // Deterministic "time left": shrinks with every question, so a
+      // `while (deadline.timeRemaining() > 0)` loop does a fixed amount of work.
+      let asked = 0;
+      safely(cb, { didTimeout: false, timeRemaining: () => Math.max(0, 50 - 5 * asked++) });
+    }
   }
+
+  // ── Framework tasks (MessageChannel) ──────────────────────────────────────
+  // React and other schedulers do their rendering in tasks posted through a
+  // MessageChannel, not in timers or animation frames. Those tasks run in
+  // real time, so on a busy machine a re-render triggered in this frame
+  // could land after the screenshot. ScrollRecord counts such posts and,
+  // when there were any, waits inside the frame until the chain of tasks
+  // has run (its own message is queued behind the page's ones). Bounded,
+  // so a page that posts forever still gets its frame.
+  let posted = 0;
+  const realPortPost = MessagePort.prototype.postMessage;
+  MessagePort.prototype.postMessage = function (...args) {
+    posted++;
+    return realPortPost.apply(this, args);
+  };
+  const drainChannel = new MessageChannel();
+  let drained = null;
+  drainChannel.port1.onmessage = () => drained && drained();
+  const messageRoundTrip = () =>
+    new Promise((resolve) => {
+      drained = resolve;
+      realPortPost.call(drainChannel.port2, null);
+    });
+  async function drainMessages() {
+    for (let round = 0; round < 20 && posted > 0; round++) {
+      posted = 0;
+      await messageRoundTrip();
+    }
+    posted = 0;
+  }
+
+  // ── Scroll events: exactly one per changed position ──────────────────────
+  // frame() announces a new scroll position itself, right away, so the
+  // page's scroll handlers run *before* this frame's animation callbacks.
+  // The browser would announce the same position again a moment later (its
+  // own "scroll" event during rendering). Seen twice, a position looks like
+  // "no movement": scroll velocity and direction read 0, so effects such as
+  // Lenis "skew by speed" vanished from the video (fixture 04). That second,
+  // duplicate event is stopped here, before any page listener sees it.
+  // Scrolls the site makes itself (a smooth-scroll library, scrollIntoView)
+  // land on a new position and pass through untouched.
+  const scrollTop = () => (document.scrollingElement || document.documentElement).scrollTop;
+  let announcedY = 0;
+  function announceScroll() {
+    const y = scrollTop();
+    if (y === announcedY) return;
+    announcedY = y;
+    document.dispatchEvent(new Event("scroll", { bubbles: true }));
+  }
+  window.addEventListener(
+    "scroll",
+    (event) => {
+      if (!event.isTrusted || event.target !== document) return;
+      const y = scrollTop();
+      if (y === announcedY) event.stopImmediatePropagation();
+      else announcedY = y;
+    },
+    true,
+  );
 
   // ── Intersection observers (scroll-reveal effects) ────────────────────────
   // The browser computes "element entered the viewport" during its own
@@ -156,32 +254,347 @@
     );
 
   // ── CSS & Web animations ──────────────────────────────────────────────────
-  // Every animation is paused the first time we see it and then positioned
-  // explicitly: currentTime = page time since it appeared. Animations the
-  // site itself paused (animation-play-state: paused) are left alone.
-  const firstSeen = new WeakMap();
-  const sitePaused = new WeakSet();
-  function syncAnimations() {
+  // The browser's own animation clock stands still (Animation.setPlaybackRate
+  // 0, see page.rs). Every frame, each *running* animation is moved forward
+  // by exactly the frame's time: currentTime += dt × playbackRate.
+  // Why "move running ones forward" and not "pause everything, then seek":
+  //   - the site keeps control: `animation-play-state: paused → running`
+  //     (the common "start when in view" reveal), anim.pause()/play() and
+  //     :hover pauses keep working, because ScrollRecord never calls
+  //     pause()/play() itself (CSS ignores play-state after such calls);
+  //   - animations really finish: animationend/transitionend fire and the
+  //     Web Animations `finished` promise / `onfinish` resolve, so effects
+  //     chained on them continue (fixture 02 "chain").
+  // New animations start at this frame's time (currentTime 0), whatever
+  // real time passed while the page was loading. Scroll-driven animations
+  // (animation-timeline: scroll()/view()) follow the scroll position by
+  // themselves and are left alone.
+  const seen = new WeakSet();
+  const onPageClock = (anim) => anim.timeline === document.timeline;
+  function syncAnimations(dtMs) {
     for (const anim of document.getAnimations()) {
-      if (sitePaused.has(anim)) continue;
-      if (!firstSeen.has(anim)) {
-        if (anim.playState === "paused") {
-          sitePaused.add(anim);
-          continue;
-        }
-        firstSeen.set(anim, now);
-        try {
-          anim.pause();
-        } catch {
-          continue;
-        }
-      }
+      if (!onPageClock(anim)) continue;
       try {
-        anim.currentTime = (now - firstSeen.get(anim)) * (anim.playbackRate || 1);
+        if (!seen.has(anim)) {
+          seen.add(anim);
+          if (anim.playState === "running") anim.currentTime = 0;
+        } else if (dtMs > 0 && anim.playState === "running") {
+          anim.currentTime = (Number(anim.currentTime) || 0) + dtMs * anim.playbackRate;
+        }
       } catch {
-        /* finished or removed meanwhile */
+        /* removed meanwhile */
       }
     }
+  }
+
+  // ── Video and audio ───────────────────────────────────────────────────────
+  // <video> decodes on its own clock: left alone, it plays in real time, so
+  // every render would show different video frames (fixture 06). ScrollRecord
+  // keeps one "media time" per element and moves it with page time:
+  //   - the real element never plays: it stays paused and is seeked to its
+  //     media time before every frame. A video that has never played shows
+  //     the right picture after every seek; one that Chrome had played and
+  //     that was paused afterwards sometimes kept showing an old picture
+  //     (found under load). So the `autoplay` attribute is taken over as
+  //     soon as an element appears, before Chrome could act on it (it only
+  //     autoplays once data has arrived);
+  //   - to the site it still behaves like a playing video: `paused`,
+  //     `ended`, `currentTime` and `playbackRate` report the media time and
+  //     state, play()/pause() change them, and play / playing / pause / ended
+  //     events are sent at the frame where they happen. The browser's own
+  //     play/playing/pause events (caused by keeping it paused) are hidden;
+  //   - only videos on screen are seeked (decoding is the slow part); audio
+  //     is never seeked (the video has no sound), it only reports its time.
+  const Media = HTMLMediaElement.prototype;
+  const prop = (name) => Object.getOwnPropertyDescriptor(Media, name);
+  const realPause = Media.pause;
+  const realLoad = Media.load;
+  const realPaused = prop("paused");
+  const realTime = prop("currentTime");
+  const realRate = prop("playbackRate");
+  const mediaState = new WeakMap();
+  const offDom = new Set(); // played elements outside the document (new Audio())
+  const autoplays = new WeakSet(); // elements whose `autoplay` ScrollRecord took over
+
+  function takeOverAutoplay(el) {
+    if (el.hasAttribute("autoplay")) {
+      autoplays.add(el);
+      el.removeAttribute("autoplay");
+    }
+  }
+  new MutationObserver((records) => {
+    for (const r of records) {
+      if (r.type === "attributes") takeOverAutoplay(r.target);
+      for (const node of r.addedNodes) {
+        if (node instanceof HTMLMediaElement) takeOverAutoplay(node);
+        else if (node.querySelectorAll) node.querySelectorAll("[autoplay]").forEach(takeOverAutoplay);
+      }
+    }
+  }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["autoplay"] });
+
+  function mediaOf(el) {
+    let st = mediaState.get(el);
+    if (!st) {
+      const playingNow = !realPaused.get.call(el);
+      st = {
+        playing: autoplays.has(el) || playingNow,
+        base: 0, // media time (s) at page time `since`
+        since: now,
+        rate: realRate.get.call(el) || 1,
+        // What the page has been told: "paused", "play" (play sent, waiting
+        // for data) or "playing". The browser already told it if it started
+        // an autoplay video before ScrollRecord first saw the element.
+        told: playingNow ? "playing" : "paused",
+        endedNow: false,
+        waitedForData: false,
+      };
+      mediaState.set(el, st);
+    }
+    return st;
+  }
+  // Media time is computed from a fixed starting point (not summed frame by
+  // frame), so 0.1 s steps never drift into the previous video frame.
+  const mediaTime = (st) => (st.playing ? st.base + ((now - st.since) / 1000) * st.rate : st.base);
+  function setMedia(st, changes) {
+    st.base = mediaTime(st);
+    st.since = now;
+    Object.assign(st, changes);
+  }
+  const atEnd = (el, st) => {
+    const d = el.duration;
+    return !el.loop && Number.isFinite(d) && d > 0 && mediaTime(st) >= d;
+  };
+
+  // ── What the site can call and read ──
+  Media.play = function () {
+    const st = mediaOf(this);
+    if (!st.playing) {
+      if (atEnd(this, st)) st.base = 0; // play() after the end starts over
+      setMedia(st, { playing: true });
+    }
+    if (!this.isConnected) offDom.add(this);
+    // No data yet (preload="none"): load it, like a real play() would.
+    if (this.readyState === 0 && this.networkState !== HTMLMediaElement.NETWORK_LOADING) {
+      if (this.preload === "none") this.preload = "auto";
+      realLoad.call(this);
+    }
+    return Promise.resolve();
+  };
+  Media.pause = function () {
+    setMedia(mediaOf(this), { playing: false });
+    if (!realPaused.get.call(this)) realPause.call(this);
+  };
+  Media.load = function () {
+    const st = mediaOf(this);
+    setMedia(st, { base: 0, playing: autoplays.has(this), waitedForData: false });
+    return realLoad.call(this);
+  };
+  const virtual = (name, get, set) =>
+    Object.defineProperty(Media, name, { configurable: true, enumerable: true, get, set });
+  virtual("paused", function () {
+    return !mediaOf(this).playing;
+  });
+  virtual(
+    "autoplay",
+    function () {
+      return autoplays.has(this);
+    },
+    function (value) {
+      if (value) autoplays.add(this);
+      else autoplays.delete(this);
+    },
+  );
+  virtual("ended", function () {
+    return atEnd(this, mediaOf(this));
+  });
+  virtual(
+    "playbackRate",
+    function () {
+      return mediaOf(this).rate;
+    },
+    function (value) {
+      setMedia(mediaOf(this), { rate: Number(value) });
+    },
+  );
+  virtual(
+    "currentTime",
+    function () {
+      return mediaTime(mediaOf(this));
+    },
+    function (value) {
+      setMedia(mediaOf(this), { base: Math.max(0, Number(value) || 0) });
+      realTime.set.call(this, mediaOf(this).base);
+    },
+  );
+  // The browser's own play/playing/pause events of managed elements say
+  // nothing true about the video the page shows; ScrollRecord sends its own.
+  for (const type of ["play", "playing", "pause"]) {
+    window.addEventListener(
+      type,
+      (event) => {
+        if (event.isTrusted && event.target instanceof HTMLMediaElement && mediaState.has(event.target)) {
+          event.stopImmediatePropagation();
+        }
+      },
+      true,
+    );
+  }
+
+  function allMedia() {
+    const list = [...document.querySelectorAll("video, audio")];
+    for (const el of offDom) {
+      if (el.isConnected || !mediaOf(el).playing) offDom.delete(el);
+      else list.push(el);
+    }
+    return list;
+  }
+  const once = (el, events, ms) =>
+    withTimeout(
+      new Promise((resolve) => {
+        for (const e of events) el.addEventListener(e, resolve, { once: true });
+      }),
+      ms,
+    );
+  const onScreen = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight;
+  };
+
+  // Tells the page about state changes since the last frame, in order.
+  function announce(el, st) {
+    const send = (type) => el.dispatchEvent(new Event(type));
+    if (st.playing) {
+      if (st.told === "paused") {
+        st.told = "play";
+        send("play");
+      }
+      if (st.told === "play" && el.readyState >= 3) {
+        st.told = "playing";
+        send("playing");
+      }
+    } else if (st.told !== "paused") {
+      st.told = "paused";
+      send("pause");
+      if (st.endedNow) send("ended");
+    }
+    st.endedNow = false;
+  }
+
+  // Ends or loops elements that reached their end, keeps every element
+  // paused for real, then seeks the visible videos to their media time and
+  // waits until the new picture is decoded. A second pass checks that
+  // nothing moved meanwhile.
+  async function syncMedia() {
+    for (let pass = 0; pass < 3; pass++) {
+      const waits = [];
+      let corrected = false;
+      for (const el of allMedia()) {
+        const st = mediaOf(el);
+        // Only if something played it for real anyway (e.g. its own controls).
+        if (!realPaused.get.call(el)) {
+          realPause.call(el);
+          corrected = true;
+        }
+        const d = el.duration;
+        if (st.playing && Number.isFinite(d) && d > 0 && mediaTime(st) >= d) {
+          if (el.loop) setMedia(st, { base: mediaTime(st) % d });
+          else setMedia(st, { base: d, playing: false, endedNow: true });
+        }
+        announce(el, st);
+        if (el.tagName !== "VIDEO" || !onScreen(el)) continue;
+        // A video that should show a picture but has no data yet: wait for
+        // it once (otherwise it would pop in at a random frame).
+        if (el.readyState < 2 && !st.waitedForData && (st.playing || el.preload !== "none")) {
+          st.waitedForData = true;
+          if (el.networkState !== HTMLMediaElement.NETWORK_NO_SOURCE) {
+            await once(el, ["loadeddata", "error"], 10000);
+          }
+        }
+        // Compared with where the element really is, not where it was sent.
+        const t = mediaTime(st);
+        if (el.readyState >= 1 && Math.abs(realTime.get.call(el) - t) > 0.0005) {
+          realTime.set.call(el, t);
+          corrected = true;
+        }
+        if (el.seeking) waits.push(once(el, ["seeked", "error"], 5000));
+      }
+      if (waits.length) await Promise.all(waits);
+      if (!corrected) break;
+    }
+  }
+
+  // ── Animated images (GIF, animated WebP / PNG / AVIF) ─────────────────────
+  // The browser animates these on its own real-time clock, and nothing in
+  // the page can slow it down. So ScrollRecord decodes each animated image
+  // once (ImageDecoder, built into Chrome/Edge), keeps every frame as a
+  // still picture, and shows the frame that belongs to the page time by
+  // swapping the <img> source. Only images on screen are swapped.
+  // Limits: CSS background images and <picture> sources keep real time;
+  // images from other sites are left alone when the browser forbids reading
+  // them.
+  const decoded = new Map(); // original URL → Promise<animation | null>
+  const imageState = new WeakMap(); // <img> → { url, start, shown, frames }
+  const STILL = /\.(jpe?g|svg|bmp|ico)([?#]|$)/i;
+
+  async function decodeAnimation(url) {
+    if (typeof ImageDecoder !== "function" || STILL.test(url)) return null;
+    try {
+      const res = await realFetch(url);
+      const type = (res.headers.get("content-type") || "").split(";")[0].trim();
+      if (!res.ok || !(await ImageDecoder.isTypeSupported(type))) return null;
+      const decoder = new ImageDecoder({ data: await res.arrayBuffer(), type });
+      await decoder.tracks.ready;
+      const track = decoder.tracks.selectedTrack;
+      if (!track || !track.animated) return null;
+      await decoder.completed;
+      const frames = [];
+      let end = 0;
+      for (let i = 0; i < track.frameCount; i++) {
+        const { image } = await decoder.decode({ frameIndex: i });
+        const canvas = new OffscreenCanvas(image.displayWidth, image.displayHeight);
+        canvas.getContext("2d").drawImage(image, 0, 0);
+        // Like browsers: frames of 10 ms or less are shown for 100 ms.
+        const ms = (image.duration || 0) / 1000;
+        end += ms > 10 ? ms : 100;
+        image.close();
+        const blob = await canvas.convertToBlob({ type: "image/png" });
+        frames.push({ src: URL.createObjectURL(blob), end });
+      }
+      decoder.close();
+      const plays = track.repetitionCount === Infinity ? Infinity : track.repetitionCount + 1;
+      return { frames, total: end, plays };
+    } catch {
+      return null;
+    }
+  }
+
+  async function syncImages() {
+    const loads = [];
+    for (const img of document.images) {
+      if (!img.complete || !onScreen(img)) continue;
+      let st = imageState.get(img);
+      const current = img.currentSrc || img.src;
+      if (!st || (current !== st.url && current !== st.shownSrc)) {
+        if (!current || current.startsWith("blob:")) continue;
+        st = { url: current, start: now, shown: -1, shownSrc: null, anim: null };
+        imageState.set(img, st);
+        if (!decoded.has(current)) decoded.set(current, decodeAnimation(current));
+        st.anim = await decoded.get(current);
+      }
+      const anim = st.anim;
+      if (!anim) continue;
+      const elapsed = now - st.start;
+      const finished = anim.plays !== Infinity && elapsed >= anim.total * anim.plays;
+      const local = finished ? anim.total - 0.001 : elapsed % anim.total;
+      const index = anim.frames.findIndex((f) => local < f.end);
+      if (index === st.shown || index < 0) continue;
+      st.shown = index;
+      st.shownSrc = anim.frames[index].src;
+      if (img.hasAttribute("srcset")) img.removeAttribute("srcset");
+      img.src = st.shownSrc;
+      loads.push(img.decode().catch(() => {}));
+    }
+    if (loads.length) await Promise.all(loads);
   }
 
   // ── Locators (see crates/sr-core/src/flow/locator.rs) ─────────────────────
@@ -302,18 +715,16 @@
   }
 
   // True while a finite animation or transition is still playing (used by
-  // the probe to know when a block has finished appearing).
+  // the probe to know when a block has finished appearing). Paused and
+  // scroll-driven animations don't count: waiting would not finish them.
   function animationsBusy() {
     for (const anim of document.getAnimations()) {
-      if (sitePaused.has(anim) || !anim.effect) continue;
+      if (!onPageClock(anim) || anim.playState !== "running" || !anim.effect) continue;
       const end = anim.effect.getComputedTiming().endTime;
-      if (Number.isFinite(end) && (Number(anim.currentTime) || 0) < end) return true;
+      if (Number.isFinite(end)) return true;
     }
     return false;
   }
-
-  const realWait = (ms) => new Promise((resolve) => realSetTimeout(resolve, ms));
-  const withTimeout = (promise, ms) => Promise.race([promise, realWait(ms)]);
 
   window.__sr = Object.freeze({
     /** Current page time in ms. */
@@ -322,7 +733,7 @@
     /** Moves page time forward without drawing (used for warm-up). */
     advance(ms) {
       advance(ms);
-      syncAnimations();
+      syncAnimations(ms);
       return now;
     },
 
@@ -333,15 +744,31 @@
     async frame(scrollY, dtMs) {
       window.scrollTo(0, scrollY);
       // Deliver the scroll event now, so scroll-linked code reacts in this frame.
-      document.dispatchEvent(new Event("scroll", { bubbles: true }));
+      announceScroll();
       advance(dtMs);
-      syncAnimations();
+      syncAnimations(dtMs);
+      let waited = false;
+      if (posted > 0) {
+        await drainMessages();
+        waited = true;
+      }
       if (observers.size > 0) {
         await settleObservers();
-        // Transitions started by observer callbacks begin at this frame's time.
-        syncAnimations();
+        if (posted > 0) await drainMessages();
+        waited = true;
       }
-      return (document.scrollingElement || document.documentElement).scrollTop;
+      // Video/audio and animated images show this frame's time; their
+      // play/pause events may start more work for the page.
+      if (document.querySelector("video, audio") || offDom.size) {
+        await syncMedia();
+        waited = true;
+      }
+      if (document.images.length) await syncImages();
+      if (posted > 0) await drainMessages();
+      // Transitions started by observer callbacks, framework renders or
+      // media events begin at this frame's time.
+      if (waited) syncAnimations(0);
+      return scrollTop();
     },
 
     /** Page preparation before recording (HANDOFF FR-VP-04). */
@@ -387,7 +814,11 @@
         }
       }
       window.scrollTo(0, 0);
-      syncAnimations();
+      announceScroll();
+      await drainMessages();
+      syncAnimations(0);
+      await syncMedia();
+      await syncImages();
       return { invalidSelectors: invalid };
     },
 
@@ -396,8 +827,9 @@
      * frame: hover transitions that just started begin at this frame's time.
      * Returns the cursor image the page asks for under (x, y), if wanted.
      */
-    pointer(x, y, sync, wantKind) {
-      if (sync) syncAnimations();
+    async pointer(x, y, sync, wantKind) {
+      if (posted > 0) await drainMessages();
+      if (sync) syncAnimations(0);
       return wantKind ? cursorKind(x, y) : null;
     },
 

@@ -1,0 +1,139 @@
+{
+  "format_version": 1,
+  "meta": {
+    "name": "Fixture 06 — video, Lottie, canvas, GIF",
+    "site": "../tests/fixtures/sites/06-media"
+  },
+  "targets": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "aspect": "16:9",
+      "resolution": "1080p",
+      "fps": 60
+    }
+  ],
+  "defaults": {
+    "scroll": {
+      "speed_px_s": 900,
+      "easing": "ease-in-out"
+    },
+    "hold_ms": 1000,
+    "cursor": {
+      "pack": "classic-dark",
+      "seed": 11
+    }
+  },
+  "prepare": {
+    "wait": "network_idle"
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "/"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "start",
+      "at": {
+        "block": "video",
+        "anchor": "top"
+      }
+    },
+    {
+      "id": "video",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "video"
+        }
+      ],
+      "hold_ms": 2000
+    },
+    {
+      "id": "clip",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "clip"
+        }
+      ],
+      "hold_ms": 2000
+    },
+    {
+      "id": "lottie",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "lottie"
+        }
+      ],
+      "hold_ms": 1500
+    },
+    {
+      "id": "canvas",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "canvas"
+        }
+      ],
+      "hold_ms": 1500
+    },
+    {
+      "id": "gif",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "gif"
+        }
+      ],
+      "hold_ms": 1500
+    },
+    {
+      "id": "end",
+      "kind": "end",
+      "at": {
+        "block": "gif",
+        "anchor": "bottom"
+      },
+      "hold_ms": 800
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "video"
+    },
+    {
+      "from": "video",
+      "to": "clip"
+    },
+    {
+      "from": "clip",
+      "to": "lottie"
+    },
+    {
+      "from": "lottie",
+      "to": "canvas"
+    },
+    {
+      "from": "canvas",
+      "to": "gif"
+    },
+    {
+      "from": "gif",
+      "to": "end"
+    }
+  ]
+}

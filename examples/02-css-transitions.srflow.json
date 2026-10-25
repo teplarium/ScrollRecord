@@ -1,0 +1,137 @@
+{
+  "format_version": 1,
+  "meta": {
+    "name": "Fixture 02 — CSS transitions",
+    "site": "../tests/fixtures/sites/02-css-transitions"
+  },
+  "targets": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "aspect": "16:9",
+      "resolution": "1080p",
+      "fps": 60
+    }
+  ],
+  "defaults": {
+    "scroll": {
+      "speed_px_s": 900,
+      "easing": "ease-in-out"
+    },
+    "hold_ms": 1000,
+    "cursor": {
+      "pack": "classic-dark",
+      "seed": 11
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "/"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "start",
+      "at": {
+        "block": "intro",
+        "anchor": "top"
+      }
+    },
+    {
+      "id": "intro",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "intro"
+        }
+      ],
+      "hold_ms": 3000
+    },
+    {
+      "id": "chain",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "chain"
+        }
+      ],
+      "hold_ms": 800
+    },
+    {
+      "id": "playstate",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "playstate"
+        }
+      ],
+      "hold_ms": 1500
+    },
+    {
+      "id": "timeline",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "timeline"
+        }
+      ],
+      "hold_ms": 0,
+      "align": "center"
+    },
+    {
+      "id": "media",
+      "kind": "block",
+      "page": "home",
+      "target": [
+        {
+          "sr": "media"
+        }
+      ],
+      "hold_ms": 800
+    },
+    {
+      "id": "end",
+      "kind": "end",
+      "at": {
+        "block": "media",
+        "anchor": "bottom"
+      },
+      "hold_ms": 800
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "intro"
+    },
+    {
+      "from": "intro",
+      "to": "chain"
+    },
+    {
+      "from": "chain",
+      "to": "playstate"
+    },
+    {
+      "from": "playstate",
+      "to": "timeline"
+    },
+    {
+      "from": "timeline",
+      "to": "media"
+    },
+    {
+      "from": "media",
+      "to": "end"
+    }
+  ]
+}

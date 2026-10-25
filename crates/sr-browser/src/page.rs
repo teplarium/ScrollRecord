@@ -254,6 +254,19 @@ impl Page<'_> {
         if let Some(ua) = &e.user_agent {
             self.call("Emulation.setUserAgentOverride", json!({ "userAgent": ua }))?;
         }
+        // ── User preferences that must not leak into the video ──
+        // Why: Chrome passes the computer's settings to the page. With
+        // "reduce motion" or a dark theme turned on in Windows, sites switch
+        // off their animations or change colours, so the same scenario would
+        // give a different video on another computer (fixture 02 "media").
+        // ScrollRecord always records the default: full motion, light theme.
+        self.call(
+            "Emulation.setEmulatedMedia",
+            json!({ "features": [
+                { "name": "prefers-reduced-motion", "value": "no-preference" },
+                { "name": "prefers-color-scheme", "value": "light" },
+            ] }),
+        )?;
         Ok(())
     }
 

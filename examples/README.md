@@ -3,6 +3,11 @@
 | File | What it shows |
 |---|---|
 | `01-plain-landing.srflow.json` | The fixture landing page (`tests/fixtures/sites/01-plain-landing`) on desktop (16:9) and iPhone (9:16): holds, a pass-through block, `align: center`, end anchor, a device override. Cursor: real hover on *Get started* (desktop only), hover on the Pro plan, a visual click on *Choose Pro* (a tap on the iPhone), cursor fading out on the last scroll |
+| `02-css-transitions.srflow.json` | Test site 02: delayed entrances, effects chained on animation ends, "paused until in view" cards, a native scroll-driven bar (desktop 16:9) |
+| `03-gsap-scrolltrigger.srflow.json` | Test site 03: GSAP intro, scrubbed bars, a pinned section moving sideways, reveal cards |
+| `04-lenis-smooth-scroll.srflow.json` | Test site 04: Lenis smooth scroll — the box skews with scroll speed, the header hides while going down, parallax |
+| `05-react-spa.srflow.json` | Test site 05: a React app — count-up, content from `fetch()` (`"wait": "network_idle"`), two **real** clicks on tabs |
+| `06-media.srflow.json` | Test site 06: autoplay video, a video started when visible, Lottie, canvas/WebGL, animated GIF — all in step with the video's timeline |
 
 Render (from the repository root):
 

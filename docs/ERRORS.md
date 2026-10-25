@@ -126,7 +126,8 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 **The page failed to load.** The URL couldn't be opened, or the page didn't finish loading in time.
 
 - **Common causes:** the local dev server isn't running; a wrong URL or page path; no internet for online sites.
-- **What to do:** open the URL from the `url` parameter in a normal browser. For local folders, check that `index.html` exists.
+- **What to do:** open the URL from the `url` parameter in a normal browser. For local folders, check that `index.html` exists. A page path without a file (`/pricing`) is answered with `pricing.html`, or with `index.html` for single-page apps (React, Vue).
+- **Developers:** a local folder that never finishes loading points to the built-in server (`crates/sr-site/src/server.rs`, test `pages_with_many_files_always_load`).
 
 ## SR-3005
 

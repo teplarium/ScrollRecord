@@ -1,0 +1,58 @@
+<!doctype html>
+<!--
+  Fixture 03 — GSAP + ScrollTrigger.
+  Purpose: the most popular animation library on landing pages. GSAP runs
+  its own clock (requestAnimationFrame + performance.now) and ScrollTrigger
+  reads the scroll position and adds "pin spacers" that make the page
+  taller. Capture must keep all of that in sync with the video frames.
+  Covers:
+    hero      intro timeline on load (from-tweens with stagger)
+    scrub     scrub: true (scroll position → progress, no time involved)
+              and scrub: 0.5 (progress catches up over 0.5 s of page time)
+    pin       pinned section with horizontal movement while pinned (the
+              classic "horizontal scroll" section); pin spacer adds 1200px
+    reveal    once-per-card reveal with toggleActions (time-based tween
+              started by scrolling)
+  Libraries: vendor/ (GSAP 3.15 — see vendor/README.md for its licence).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fixture 03 — GSAP ScrollTrigger</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="hero" data-sr="hero">
+      <h1 class="hero__title">Scroll stories</h1>
+      <p class="hero__lead">Animated with GSAP and ScrollTrigger.</p>
+      <div class="hero__dots"><i></i><i></i><i></i><i></i></div>
+    </section>
+
+    <section class="scrub" data-sr="scrub">
+      <h2>Scrubbed by scroll</h2>
+      <div class="track"><div class="fill" id="scrub-exact"></div></div>
+      <div class="track"><div class="fill fill--smooth" id="scrub-smooth"></div></div>
+    </section>
+
+    <section class="pin" data-sr="pin">
+      <h2 class="pin__title">Pinned</h2>
+      <div class="pin__row" id="pin-row">
+        <div class="panel">1</div><div class="panel">2</div><div class="panel">3</div><div class="panel">4</div>
+      </div>
+    </section>
+
+    <section class="reveal" data-sr="reveal">
+      <h2>Revealed once</h2>
+      <div class="cards">
+        <div class="card">A</div><div class="card">B</div><div class="card">C</div>
+      </div>
+    </section>
+
+    <footer class="footer" data-sr="footer">Fixture 03 · GSAP ScrollTrigger</footer>
+
+    <script src="vendor/gsap.min.js"></script>
+    <script src="vendor/ScrollTrigger.min.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>

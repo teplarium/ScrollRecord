@@ -1,0 +1,67 @@
+<!doctype html>
+<!--
+  Fixture 02 — CSS transitions and animations (no libraries).
+  Purpose: CSS effects that fixture 01 does not cover, each one a known way
+  to break frame-by-frame capture (Phase 1b, HANDOFF §14).
+  Covers:
+    intro      staggered keyframe entrance (animation-delay) and a long
+               transition with transition-delay, started from JS on load
+    chain      effects chained by events: animationend → transitionend →
+               Web Animations `finished` promise
+    play-state the very common "paused until in view" reveal:
+               animation-play-state: paused → running when scrolled into view
+    timeline   CSS scroll-driven animation (animation-timeline: view())
+    media      prefers-reduced-motion / prefers-color-scheme markers
+  Every effect ends in a solid colour at a fixed spot, so tests can check
+  pixels or computed styles. Sizes are in px so positions are predictable.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fixture 02 — CSS transitions</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="intro" data-sr="intro">
+      <h1 class="words">
+        <span class="word">Calm</span>
+        <span class="word">motion</span>
+        <span class="word">everywhere</span>
+      </h1>
+      <div class="track"><div class="bar" id="bar"></div></div>
+    </section>
+
+    <section class="chain" data-sr="chain">
+      <h2>Chained by events</h2>
+      <div class="boxes">
+        <div class="box" id="chain-a">A</div>
+        <div class="box" id="chain-b">B</div>
+        <div class="box" id="chain-c">C</div>
+        <div class="box" id="chain-d">D</div>
+      </div>
+    </section>
+
+    <section class="playstate" data-sr="playstate">
+      <h2>Paused until in view</h2>
+      <div class="cards">
+        <div class="card ps" id="ps-1">1</div>
+        <div class="card ps" id="ps-2">2</div>
+        <div class="card ps" id="ps-3">3</div>
+      </div>
+    </section>
+
+    <section class="timeline" data-sr="timeline">
+      <h2>Scroll-driven</h2>
+      <div class="sd-track"><div class="sd-bar" id="sd-bar"></div></div>
+    </section>
+
+    <section class="media" data-sr="media">
+      <div class="marker" id="motion-marker">motion</div>
+      <div class="marker" id="scheme-marker">scheme</div>
+    </section>
+
+    <div class="spacer"></div>
+    <script src="main.js"></script>
+  </body>
+</html>

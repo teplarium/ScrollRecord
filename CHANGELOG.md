@@ -5,6 +5,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Phase 1b — tested on "heavy" sites
+- Five new test sites: CSS animations, GSAP + ScrollTrigger, Lenis smooth scroll, a React app, and a page with video, Lottie, canvas/WebGL and an animated GIF. Each one now renders smoothly and gives exactly the same frames twice. Example scenarios for them are in `examples/` (02–06).
+
+### Fixed
+- Cards that are "paused until they come into view" (a very common CSS trick) stayed invisible in videos. They now play when they appear.
+- Native CSS scroll animations (`animation-timeline`) froze; they now follow the scroll.
+- Effects that start when another animation ends never started; they do now.
+- Effects that depend on scroll speed or direction (for example Lenis "skew while scrolling", headers that hide when scrolling down) disappeared, because the page heard every scroll position twice. Now it hears it once.
+- Videos on the page played in real time, so every render showed different video frames. Videos now follow the video's own timeline exactly (at 0.8 s you always see the frame of 0.8 s), and play/pause/end events reach the site at the right frame.
+- Animated GIFs (and animated WebP/PNG) also played in real time; they now follow the video's timeline too.
+- A local site that loads several files at once could sometimes never finish loading (error SR-3004). The built-in web server was replaced by a simpler, sturdier one.
+- The computer's own settings ("reduce motion", dark theme) no longer change the video: ScrollRecord always records full motion and the light theme.
+
+### Added
+- Local site folders now behave like on common hosting: `/about` opens `about.html`, any address of a single-page app (React, Vue, …) opens the app, and videos can be rewound.
+- React and other frameworks finish their updates inside the frame that caused them; delayed "do it when idle" work also happens at a fixed moment.
+
+### Phase 2 — cursor
 - **Cursor in videos (Phase 2).** The cursor moves like a hand (pause, curved path, soft stop, small overshoot), hovers so the site really reacts, clicks with a press and a ripple, and shows a finger circle for taps on phones. Two built-in cursor packs: `classic-dark`, `classic-light`. Custom packs: a folder with `cursor-pack.json` + SVGs.
 - Buttons inside blocks that slide in are measured after they appear, so the cursor lands on them.
 - `scrollrecord validate` also checks the cursor pack and shows how many actions each device gets.

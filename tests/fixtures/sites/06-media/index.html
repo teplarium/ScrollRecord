@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  Fixture 06 — media with clocks of their own.
+  Purpose: things that do NOT follow the page's JavaScript clock by
+  themselves: <video> decoding, animated GIFs, and players/canvases that
+  draw on every animation frame. In a video every one of them must show the
+  picture that belongs to that frame's time, render after render.
+  Covers:
+    video   muted autoplay loop (media/counter.webm: each frame shows its own
+            number as 6 black/white stripes, 30 fps, 2 s) and a second copy
+            that the page starts with play() once it is in view
+    lottie  lottie-web player (rAF + timestamps), media/move.json: a box
+            moving from x=20 to x=180 over 2 s
+    canvas  2D canvas and WebGL redrawn on every animation frame
+    gif     animated GIF, 4 colours × 250 ms (red, green, blue, yellow)
+  Libraries: vendor/ (lottie-web 5.13 light build — MIT).
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fixture 06 — media</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="video" data-sr="video">
+      <video id="loop" src="media/counter.webm" autoplay muted loop playsinline></video>
+    </section>
+
+    <section class="clip" data-sr="clip">
+      <video id="clip" src="media/counter.webm" muted playsinline preload="auto"></video>
+    </section>
+
+    <section class="lottie" data-sr="lottie">
+      <div id="lottie" class="lottie__box"></div>
+    </section>
+
+    <section class="canvas" data-sr="canvas">
+      <canvas id="c2d" width="400" height="40"></canvas>
+      <canvas id="cgl" width="100" height="100"></canvas>
+    </section>
+
+    <section class="gif" data-sr="gif">
+      <img id="gif" src="media/blink.gif" width="128" height="128" alt="blinking square" />
+    </section>
+
+    <div class="spacer"></div>
+    <script src="vendor/lottie_light.min.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>

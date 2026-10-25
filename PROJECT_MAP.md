@@ -4,7 +4,7 @@
 > **Update it in the same commit** whenever you add, rename or remove a crate, a feature folder, a public type or an IPC command.
 > Requirements and the roadmap are in [`HANDOFF.md`](HANDOFF.md) (Russian). Rules for AI assistants are in [`AGENTS.md`](AGENTS.md).
 
-**Current phase:** 2 — cursor & composition ✅ · **Next:** Phase 1b (heavy sites) or Phase 3 (editor), owner's choice
+**Current phase:** 1b — heavy sites ✅ (after 0, 1, 2) · **Next:** Phase 3 (editor)
 
 ---
 
@@ -20,7 +20,7 @@ ScrollRecord renders smooth, frame-perfect scroll videos of websites for any dev
 ```
 *.srflow.json ──► sr-core: Flow::from_json → validate → plan(target)   (ordered start → blocks → end)
                      │
-sr-site: folder → local HTTP server (or URL)
+sr-site: folder → local HTTP server (or URL); ranges, clean URLs, SPA fallback
                      │
 sr-cursor: load the cursor pack (built-in or folder) — fails early if broken
                      │
@@ -37,8 +37,10 @@ sr-capture: per frame: page.step(scroll_y, 1/fps, pointer) ──► page.captur
                      │                                     │
                      │   js/runtime.js inside the page:    ▼  worker thread
                      │   frozen clock, timers, rAF,     sr-compositor: PNG → pixels,
-                     │   CSS animations, observers,     ripples, touch circles, cursor
-                     │   cursor kind under the pointer     │
+                     │   idle callbacks, CSS animations, ripples, touch circles, cursor
+                     │   scroll events, observers,         │
+                     │   framework tasks, video/audio,     │
+                     │   animated images, cursor kind      │
                      │                                     ▼
                      │                                  sr-encoder: VideoSink (raw RGBA)
                      │                                  ffmpeg (MP4/WebM) or PNG folder
@@ -59,14 +61,14 @@ The UI talks to Rust only through **IPC commands** whose types are **generated**
 | `sr-core` | ✅ | Scenario format v1, easing, `SR-xxxx` error catalog, validation, per-target plan. **No IO** | `flow/mod.rs` (types, parsing), `flow/path.rs` (validation + `plan()`), `flow/target.rs` (devices, aspect, resolution → pixel geometry), `flow/locator.rs`, `flow/action.rs` (hover/click/move/wait), `flow/cursor.rs` (cursor settings, scroll behaviour), `easing.rs`, `error.rs` |
 | `sr-ipc` | ✅ | IPC contract DTOs, exported to TypeScript | `app_info.rs` |
 | `sr-diagnostics` | ✅ | Logging setup (later: problem-report zip) | `lib.rs` |
-| `sr-site` | ✅ | Site source: folder → built-in HTTP server on 127.0.0.1, or URL | `lib.rs` (`SiteSource`, `serve`), `server.rs` |
-| `sr-browser` | ✅ | Find & launch Chrome/Edge/Chromium; minimal DevTools-protocol client; device emulation; mouse/touch input; page runtime | `locate.rs`, `process.rs`, `cdp.rs`, `page.rs` (incl. `probe`, pointer input), **`js/runtime.js`** (virtual time, prepare, measure, locators, cursor kind, settle) |
+| `sr-site` | ✅ | Site source: folder → built-in HTTP server on 127.0.0.1 (std only: thread per connection, byte ranges, clean URLs, single-page-app fallback), or URL | `lib.rs` (`SiteSource`, `serve`), `server.rs` |
+| `sr-browser` | ✅ | Find & launch Chrome/Edge/Chromium; minimal DevTools-protocol client; device emulation (incl. fixed media preferences); mouse/touch input; page runtime | `locate.rs`, `process.rs`, `cdp.rs`, `page.rs` (incl. `probe`, pointer input), **`js/runtime.js`** (virtual time, animations, scroll events, framework tasks, video/audio, animated images, prepare, measure, locators, cursor kind, settle) |
 | `sr-timeline` | ✅ | Plan + measurements → segments (scroll/hold) + cursor track → frames. Pure maths | `lib.rs` (`PageMetrics`, `Timeline`, waypoint merging, stops), `cursor.rs` (human-like moves, clicks, taps, hide/follow, seeded randomness) |
 | `sr-cursor` | ✅ | Cursor packs: `cursor-pack.json` format, built-in `classic-dark` / `classic-light`, safe SVG → pixels, click animation | `manifest.rs`, `raster.rs`, `lib.rs`, **`packs/`** (built-in SVGs) |
 | `sr-compositor` | ✅ | Draws ripples, touch circles and the cursor onto each captured frame → RGBA | `lib.rs` |
 | `sr-capture` | ✅ | Frame loop: warm-up, step (+ pointer), capture, push `CapturedFrame` to a `FrameSink` | `lib.rs` |
 | `sr-encoder` | ✅ | `VideoSink`s for raw RGBA frames: ffmpeg pipe (MP4 H.264, WebM VP9) and PNG folder | `lib.rs` |
-| `sr-render` | ✅ | Orchestrator used by CLI (and later the app): `Renderer::start/render/finish`, probe + reload, compositing worker thread, output naming, `timeline.json` | `lib.rs` |
+| `sr-render` | ✅ | Orchestrator used by CLI (and later the app): `Renderer::start/render/finish`, probe + reload, compositing worker thread, output naming, `timeline.json` | `lib.rs`; tests: `tests/render_fixture.rs` (fixture 01), `tests/heavy_sites.rs` (fixtures 02–06) |
 | `sr-cli` | ✅ | `scrollrecord` command: `render`, `validate`, `info`, `errors` | `main.rs`, `commands/*.rs` |
 | `sr-analyzer` | ⏳ Phase 3 | DOM boxes for the editor, block auto-detection, tiles, site digest | — |
 | `sr-skill` | ⏳ Phase 5 | AI skill packages | — |
@@ -107,13 +109,13 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|
 | `packaging/cli/` | Files shipped in the CLI package: `README.txt`, `render(.bat/.sh)` (drag & drop), `render-example(.bat/.sh)` |
 | `scripts/package-cli.sh` | Builds `dist/ScrollRecord-CLI/` (used by CI job `cli`) |
-| `examples/` | Example scenarios; `01-plain-landing.srflow.json` renders the fixture site (desktop 16:9 + iPhone 9:16) with hover, click and tap |
-| `tests/fixtures/sites/` | Test pages for capture (`01-plain-landing/`: plain HTML/CSS/JS with `data-sr` blocks) |
+| `examples/` | Example scenarios; `01-plain-landing.srflow.json` renders the fixture site (desktop 16:9 + iPhone 9:16) with hover, click and tap; `02…06` render the heavy test sites |
+| `tests/fixtures/sites/` | Test pages for capture: `01-plain-landing/` (plain HTML/CSS/JS), `02-css-transitions/`, `03-gsap-scrolltrigger/`, `04-lenis-smooth-scroll/`, `05-react-spa/` (source + built `app.js`), `06-media/` (video, Lottie, canvas, GIF). Third-party libraries in each `vendor/` with a licence note. Overview: `tests/fixtures/sites/README.md` |
 | `HANDOFF.md` | Requirements, decisions (D-xx), roadmap (Russian) |
 | `AGENTS.md` | Rules for AI assistants (`CLAUDE.md` and `GEMINI.md` point here) |
 | `CONTRIBUTING.md` | Dev setup, workflow, recipes |
 | `docs/ERRORS.md` | Error catalog: one `## SR-xxxx` section per code |
-| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition |
+| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server) |
 | `.github/` | CI (Rust + UI on Windows & Linux; artifacts: CLI package + installers), issue forms |
 | `.cargo/config.toml` | Where ts-rs writes TypeScript bindings |
 | `rust-toolchain.toml` | Pinned Rust version (1.97.0) |
@@ -162,7 +164,14 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|
 | Video stutters / repeated frames while scrolling | `sr-capture` loop; `js/runtime.js` → `frame()`; check `timeline.json` segments |
 | Two renders of the same scenario differ | `js/runtime.js` (time shim, `syncAnimations`, observer settle); `page.rs` → `freeze_animation_clock`; ADR 0002 |
-| An animation plays too fast / doesn't play | `js/runtime.js` → `syncAnimations` (site-paused animations are skipped on purpose); `warmup_ms` on the start node |
+| An animation plays too fast / doesn't play | `js/runtime.js` → `syncAnimations` (only *running* animations on the page clock are moved; paused and scroll-driven ones are left to the site/browser); `warmup_ms` on the start node; fixture 02 |
+| Effect that depends on scroll speed/direction is missing (Lenis, "hide header on scroll") | `runtime.js` → `announceScroll` and the capture `scroll` listener (one event per changed position); fixture 04 |
+| React/Vue content appears one frame late or differs between renders | `runtime.js` → `drainMessages` (MessageChannel tasks), `requestIdleCallback`; fixture 05 |
+| A `<video>` shows the wrong frame / differs between renders | `runtime.js` → "Video and audio" (`syncMedia`, autoplay take-over); server byte ranges in `sr-site/src/server.rs`; fixture 06, ADR 0004 |
+| Animated GIF plays at the wrong speed / differs | `runtime.js` → `syncImages` / `decodeAnimation` (ImageDecoder); CSS background GIFs are not handled (ADR 0004) |
+| Page never finishes loading (SR-3004) on a local folder | `sr-site/src/server.rs` (thread per connection); test `pages_with_many_files_always_load` |
+| Deep link of a React/Vue app (`/pricing`) gives 404, or `/about` doesn't open `about.html` | `sr-site/src/server.rs` → `resolve` (clean URLs, single-page-app fallback only for `Accept: text/html`) |
+| Video looks different on another computer (dark theme, "reduce motion") | `page.rs` → `emulate` (`Emulation.setEmulatedMedia`) |
 | Scroll-reveal content missing | `runtime.js` IntersectionObserver wrapper; `prepare.preload_lazy` |
 | Block lands under the sticky header / wrong place | `runtime.js` → `topInset()`; `sr-timeline` `align_y` / `anchor_y`; `offset_px` |
 | `SR-2101` / `SR-2102` block not found / ambiguous | Locators in the scenario; `runtime.js` → `findAll()`; message lists what was tried. `block 'x': target of actions[n]` = an action's target (searched inside its block first) |
@@ -220,3 +229,4 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-24 | CLI package: `packaging/cli/`, `scripts/package-cli.sh`, CI job `cli`; IntersectionObserver delivery made deterministic (ADR 0002) |
 | 2026-10-24 | Phase 1: scenario format v1 in `sr-core`; new crates `sr-site`, `sr-browser`, `sr-timeline`, `sr-capture`, `sr-encoder`, `sr-render`; CLI `render`/`validate`; `examples/`; fixture 01 extended; ADR 0002 |
 | 2026-10-25 | Phase 2: `sr-core` `flow/action.rs`, `flow/cursor.rs`; `sr-timeline/src/cursor.rs`; new crates `sr-cursor` (with `packs/`), `sr-compositor`; `sr-capture` `FrameSink` takes `CapturedFrame`; `sr-encoder` `VideoSink` takes raw RGBA (no longer depends on `sr-capture`); `sr-browser` pointer input + probe; codes SR-6001/6002; ADR 0003 |
+| 2026-10-25 | Phase 1b: fixtures `02`–`06` (+ `vendor/` folders), `sr-render/tests/heavy_sites.rs`, examples `02`–`06`; `runtime.js` animation control reworked (ADR 0004), media/animated-image/scroll-event/framework-task handling; `sr-site` server rewritten on std (tiny_http removed): ranges, clean URLs, SPA fallback; ADR 0004 |

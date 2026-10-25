@@ -172,6 +172,9 @@ fn flags(profile_dir: &Path, opts: &LaunchOptions) -> Vec<String> {
         "--disable-features=Translate,MediaRouter,OptimizationHints".into(),
         "--force-color-profile=srgb".into(),
         "--mute-audio".into(),
+        // Videos the site starts with play() always start (the recording has
+        // no sound anyway), instead of depending on Chrome's autoplay rules.
+        "--autoplay-policy=no-user-gesture-required".into(),
         "--password-store=basic".into(),
         "--use-mock-keychain".into(),
     ];

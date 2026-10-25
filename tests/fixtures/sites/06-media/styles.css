@@ -1,0 +1,11 @@
+/* Fixture 06 styles. Fixed px sizes (tests use 800×450): every media
+   element sits at (40, 40) inside its own 450px section. */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #fbfaf7; }
+section { position: relative; height: 450px; padding: 40px; border-bottom: 1px solid #e6e3dc; }
+video { display: block; width: 384px; height: 216px; background: #000; }
+.lottie__box { width: 400px; height: 200px; background: #e6e3dc; }
+canvas { display: block; margin-bottom: 20px; }
+#c2d { background: #e6e3dc; }
+img { display: block; image-rendering: pixelated; }
+.spacer { height: 450px; }
