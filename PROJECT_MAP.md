@@ -4,7 +4,7 @@
 > **Update it in the same commit** whenever you add, rename or remove a crate, a feature folder, a public type or an IPC command.
 > Requirements and the roadmap are in [`HANDOFF.md`](HANDOFF.md) (Russian). Rules for AI assistants are in [`AGENTS.md`](AGENTS.md).
 
-**Current phase:** 1b — heavy sites ✅ (after 0, 1, 2) · **Next:** Phase 3 (editor)
+**Current phase:** 3 — editor (plan and progress: [`docs/phase-3-plan.md`](docs/phase-3-plan.md)) · Done: 0, 1, 1b, 2
 
 ---
 
@@ -112,7 +112,9 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `examples/` | Example scenarios; `01-plain-landing.srflow.json` renders the fixture site (desktop 16:9 + iPhone 9:16) with hover, click and tap; `02…06` render the heavy test sites |
 | `tests/fixtures/sites/` | Test pages for capture: `01-plain-landing/` (plain HTML/CSS/JS), `02-css-transitions/`, `03-gsap-scrolltrigger/`, `04-lenis-smooth-scroll/`, `05-react-spa/` (source + built `app.js`), `06-media/` (video, Lottie, canvas, GIF). Third-party libraries in each `vendor/` with a licence note. Overview: `tests/fixtures/sites/README.md` |
 | `HANDOFF.md` | Requirements, decisions (D-xx), roadmap (Russian) |
-| `AGENTS.md` | Rules for AI assistants (`CLAUDE.md` and `GEMINI.md` point here) |
+| `AGENTS.md` | Rules for AI assistants (`CLAUDE.md` and `GEMINI.md` import it) |
+| `CLAUDE.md` | Claude Code sessions: talking to the owner, saving context, session-to-session handover |
+| `docs/phase-3-plan.md` | Phase 3 steps, progress and "Next session starts here" (memory between AI sessions) |
 | `CONTRIBUTING.md` | Dev setup, workflow, recipes |
 | `docs/ERRORS.md` | Error catalog: one `## SR-xxxx` section per code |
 | `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server) |
@@ -177,6 +179,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `SR-2101` / `SR-2102` block not found / ambiguous | Locators in the scenario; `runtime.js` → `findAll()`; message lists what was tried. `block 'x': target of actions[n]` = an action's target (searched inside its block first) |
 | Cursor misses the button / hover doesn't react | `timeline.json` → `page.blocks["block#n"]` (measured box) and `cursor`; `sr-render` → `probe_targets`; `runtime.js` → `settleAt`; warning "outside the visible area" = the button isn't on screen at that stop (change `align`/`offset_px`) |
 | Hover differs between two renders | `page.rs` → `send_pointer` (position re-sent every live frame); `runtime.js` → `pointer()`; ADR 0003 |
+| Two renders differ only in one pixel row at the edge of a moving element (machine without a GPU) | Browser drawing, not the page: `process.rs` → `flags()` (`--disallow-non-exact-resource-reuse`); test `software_frames_do_not_depend_on_leftover_tile_memory`; ADR 0004 "Browser drawing without a GPU". `heavy_sites.rs` failure messages show where frames differ |
 | Wrong cursor image (arrow vs hand vs I-beam) | `runtime.js` → `cursorKind()` (CSS `cursor` of the element under the pointer) |
 | Cursor looks wrong / blurry / misplaced tip | `sr-cursor` (`raster.rs`, pack `hotspot`/`size`); `sr-compositor` → `draw()` |
 | Cursor moves robotically / too fast | `sr-timeline/src/cursor.rs` constants (Fitts timing, reaction, overshoot); scenario `cursor.speed`, `cursor.seed` |
@@ -230,3 +233,4 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-24 | Phase 1: scenario format v1 in `sr-core`; new crates `sr-site`, `sr-browser`, `sr-timeline`, `sr-capture`, `sr-encoder`, `sr-render`; CLI `render`/`validate`; `examples/`; fixture 01 extended; ADR 0002 |
 | 2026-10-25 | Phase 2: `sr-core` `flow/action.rs`, `flow/cursor.rs`; `sr-timeline/src/cursor.rs`; new crates `sr-cursor` (with `packs/`), `sr-compositor`; `sr-capture` `FrameSink` takes `CapturedFrame`; `sr-encoder` `VideoSink` takes raw RGBA (no longer depends on `sr-capture`); `sr-browser` pointer input + probe; codes SR-6001/6002; ADR 0003 |
 | 2026-10-25 | Phase 1b: fixtures `02`–`06` (+ `vendor/` folders), `sr-render/tests/heavy_sites.rs`, examples `02`–`06`; `runtime.js` animation control reworked (ADR 0004), media/animated-image/scroll-event/framework-task handling; `sr-site` server rewritten on std (tiny_http removed): ranges, clean URLs, SPA fallback; ADR 0004 |
+| 2026-10-25 | `CLAUDE.md` rewritten for Claude Code sessions; `docs/phase-3-plan.md` added (Phase 3 started) |

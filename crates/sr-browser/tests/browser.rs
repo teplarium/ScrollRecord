@@ -21,6 +21,11 @@ const PAGE: &str = "data:text/html,<html><head><style>body{margin:0} \
     <div class='dup'>x</div><div class='dup'>y</div></body></html>";
 
 fn start() -> Option<Browser> {
+    start_with(&[])
+}
+
+/// Like `start`, with extra browser flags.
+fn start_with(extra: &[&str]) -> Option<Browser> {
     let Ok(path) = find_browser(None) else {
         eprintln!("skipped: no Chromium-based browser installed");
         return None;
@@ -30,6 +35,8 @@ fn start() -> Option<Browser> {
         // CI containers often forbid Chrome's sandbox; the test page is local and trusted.
         opts.extra_args.push("--no-sandbox".into());
     }
+    opts.extra_args
+        .extend(extra.iter().map(|a| (*a).to_owned()));
     Some(Browser::launch(&path, &opts).expect("launch"))
 }
 
@@ -282,5 +289,62 @@ fn pointer_hover_click_cursor_kind_and_probe() {
     assert_eq!(page.eval("clicks").unwrap(), 1.0);
 
     page.close().unwrap();
+    browser.close();
+}
+
+/// A green card with a letter on it: an element with text on an opaque
+/// background, like the GSAP reveal cards of fixture 03.
+const CARD_PAGE: &str = "data:text/html,<!doctype html><html><head><style>\
+    body{margin:0;background:rgb(251,250,247)}\
+    .card{width:160px;height:160px;margin:40px;display:grid;place-items:center;\
+    font:40px sans-serif;color:white;background:rgb(0,160,80)}\
+    </style></head><body><div class='card' id='c'>A</div></body></html>";
+
+/// Regression (CI on Windows, phase-3-plan step 1b-fix, ADR 0004): without a
+/// GPU, Chrome drew the edge of a card that moved by a fraction of a pixel
+/// from leftover tile memory, so the same frame differed between renders
+/// depending on what that memory held. Here the card moves 20px → 8.8889px
+/// once right away and once after 7 s of idling: Chrome frees unused tile
+/// memory after 5 s, so the second time no leftover tile is available.
+/// Both screenshots must be identical.
+#[test]
+fn software_frames_do_not_depend_on_leftover_tile_memory() {
+    // Software drawing, as on machines without a GPU (CI runners, VMs).
+    let Some(mut browser) = start_with(&["--disable-gpu"]) else {
+        return;
+    };
+    let mut page = browser.new_page().expect("page");
+    page.emulate(&Emulation {
+        css_width: 800,
+        css_height: 450,
+        scale: 1.0,
+        mobile: false,
+        touch: false,
+        user_agent: None,
+    })
+    .expect("emulate");
+    let mut shot = |idle: Duration| {
+        page.navigate(CARD_PAGE, Duration::from_secs(30))
+            .expect("navigate");
+        page.prepare(&PrepareOptions::default()).expect("prepare");
+        let mut place = |y: &str| {
+            page.eval(&format!(
+                "document.getElementById('c').style.transform = 'translate3d(0px, {y}px, 0px)'"
+            ))
+            .expect("move card");
+            page.capture_png().expect("capture")
+        };
+        place("20");
+        std::thread::sleep(idle);
+        place("8.8889")
+    };
+    let right_away = shot(Duration::ZERO);
+    let after_idle = shot(Duration::from_secs(7));
+    assert!(
+        right_away == after_idle,
+        "the card's edge depends on leftover tile memory"
+    );
+
+    page.close().expect("close tab");
     browser.close();
 }

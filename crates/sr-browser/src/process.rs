@@ -175,6 +175,18 @@ fn flags(profile_dir: &Path, opts: &LaunchOptions) -> Vec<String> {
         // Videos the site starts with play() always start (the recording has
         // no sound anyway), instead of depending on Chrome's autoplay rules.
         "--autoplay-policy=no-user-gesture-required".into(),
+        // Same frames on machines without a GPU (CI, VMs, remote desktops).
+        // There Chrome draws in software and reuses old tile memory. An
+        // element with text on an opaque background that moves by a
+        // fraction of a pixel (GSAP: translate3d(0, 8.89px, 0)) gets a new
+        // tile whose bottom/right pixel row Chrome does not clear, so what
+        // the reused memory held shows through. By default any *larger*
+        // leftover tile may be taken, and which one is free depends on
+        // raster-thread timing and idle clean-up timers: two renders
+        // differed in exactly the frames of such a tween (CI on Windows).
+        // Same-size reuse only makes that row repeatable (ADR 0004, with
+        // the one case it does not cover).
+        "--disallow-non-exact-resource-reuse".into(),
         "--password-store=basic".into(),
         "--use-mock-keychain".into(),
     ];

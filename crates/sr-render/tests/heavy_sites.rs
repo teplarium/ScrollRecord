@@ -159,6 +159,41 @@ impl Pixels {
         let i = (y * self.width + x) * self.channels;
         [self.data[i], self.data[i + 1], self.data[i + 2]]
     }
+
+    /// Alpha of a pixel (255 when the screenshot has no alpha channel).
+    fn alpha(&self, x: usize, y: usize) -> u8 {
+        if self.channels == 4 {
+            self.data[(y * self.width + x) * 4 + 3]
+        } else {
+            255
+        }
+    }
+
+    /// Where two screenshots differ, for failure messages: "N px in
+    /// x0,y0–x1,y1, max Δ d". A single row at an element's edge points to
+    /// the browser's drawing (ADR 0004), a large area to the page itself.
+    fn difference(a: &[u8], b: &[u8]) -> String {
+        let (a, b) = (Pixels::decode(a), Pixels::decode(b));
+        let height = a.data.len() / a.channels / a.width;
+        let (mut count, mut max) = (0, 0);
+        let (mut x0, mut y0, mut x1, mut y1) = (usize::MAX, usize::MAX, 0, 0);
+        for y in 0..height {
+            for x in 0..a.width {
+                let (pa, pb) = (a.at(x, y), b.at(x, y));
+                let d = (0..3)
+                    .map(|c| pa[c].abs_diff(pb[c]))
+                    .chain([a.alpha(x, y).abs_diff(b.alpha(x, y))])
+                    .max()
+                    .unwrap_or(0);
+                if d > 0 {
+                    count += 1;
+                    max = max.max(d);
+                    (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+                }
+            }
+        }
+        format!("{count} px in {x0},{y0}–{x1},{y1}, max Δ {max}")
+    }
 }
 
 fn near(c: [u8; 3], want: [u8; 3]) -> bool {
@@ -218,7 +253,13 @@ fn render_twice(site: &str, flow_json: &str) -> Option<(Vec<Vec<u8>>, Value)> {
     assert_eq!(first.len(), second.len(), "{site}: frame counts differ");
     assert!(
         differing.is_empty(),
-        "{site}: renders differ in frames {differing:?}"
+        "{site}: renders differ in frames {differing:?} ({}; frames kept in {})",
+        differing
+            .iter()
+            .map(|&i| format!("{i}: {}", Pixels::difference(&first[i], &second[i])))
+            .collect::<Vec<_>>()
+            .join(", "),
+        base.display()
     );
 
     // ── Smooth: every frame inside a scroll shows a new picture ──
