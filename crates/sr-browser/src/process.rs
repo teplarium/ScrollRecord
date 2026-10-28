@@ -44,8 +44,7 @@ impl BrowserProcess {
     /// Starts the browser and returns it together with the DevTools
     /// WebSocket URL of the browser endpoint.
     pub fn launch(executable: &Path, opts: &LaunchOptions) -> AppResult<(BrowserProcess, String)> {
-        let profile_dir = unique_profile_dir();
-        std::fs::create_dir_all(&profile_dir).map_err(|err| {
+        let profile_dir = claim_profile_dir().map_err(|err| {
             AppError::new(
                 ErrorCode::BrowserLaunchFailed,
                 format!("profile dir: {err}"),
@@ -226,13 +225,81 @@ fn hide_console_window(cmd: &mut Command) {
 #[cfg(not(windows))]
 fn hide_console_window(_cmd: &mut Command) {}
 
-fn unique_profile_dir() -> PathBuf {
+// ── Profile folder ──────────────────────────────────────────────────────────
+// Each browser needs a folder no other browser uses. Chrome allows one running
+// browser per profile folder: a second start on the same folder hands its
+// command line to the first one and exits (code 21). Process id + clock alone
+// is not unique: two browsers started in the same clock tick (parallel tests;
+// later a render next to the editor's page analysis) got one folder, then
+// drove one shared browser, and whichever finished first closed it under the
+// other (phase-3-plan step 1b-fix). `create_dir` fails if the folder exists,
+// so exactly one caller gets each name; the others try the next number.
+
+/// Creates a new, empty profile folder in the system temp folder.
+fn claim_profile_dir() -> std::io::Result<PathBuf> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    std::env::temp_dir().join(format!(
-        "scrollrecord-browser-{}-{nanos}",
-        std::process::id()
+    claim_profile_dir_in(&std::env::temp_dir(), nanos)
+}
+
+/// Creates a folder in `parent` named after this process and `nanos` that no
+/// other caller has, adding a number when the name is already taken.
+fn claim_profile_dir_in(parent: &Path, nanos: u128) -> std::io::Result<PathBuf> {
+    const ATTEMPTS: u32 = 1000;
+    std::fs::create_dir_all(parent)?;
+    for n in 0..ATTEMPTS {
+        let dir = parent.join(format!(
+            "scrollrecord-browser-{}-{nanos}-{n}",
+            std::process::id()
+        ));
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(err) => return Err(err),
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::AlreadyExists,
+        format!(
+            "{ATTEMPTS} profile folders already exist in {}",
+            parent.display()
+        ),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    /// Regression (phase-3-plan step 1b-fix): two browsers started in the
+    /// same clock tick got the same profile folder, so the second Chrome
+    /// handed over to the first (exit code 21) and both callers drove one
+    /// browser — whichever finished first closed it under the other
+    /// ("Connection reset", "Session with given id not found"). Here several
+    /// threads claim folders with one and the same clock reading; every
+    /// folder must still be a different one.
+    #[test]
+    fn launches_in_the_same_clock_tick_never_share_a_profile_folder() {
+        let parent =
+            std::env::temp_dir().join(format!("scrollrecord-profile-test-{}", std::process::id()));
+        std::fs::create_dir_all(&parent).unwrap();
+        let dirs: Vec<PathBuf> = std::thread::scope(|s| {
+            let claims: Vec<_> = (0..4)
+                .map(|_| {
+                    s.spawn(|| {
+                        (0..25)
+                            .map(|_| claim_profile_dir_in(&parent, 42).unwrap())
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            claims.into_iter().flat_map(|c| c.join().unwrap()).collect()
+        });
+        let distinct: HashSet<&PathBuf> = dirs.iter().collect();
+        let _ = std::fs::remove_dir_all(&parent);
+        assert_eq!(distinct.len(), dirs.len(), "two launches got one folder");
+    }
 }

@@ -120,6 +120,7 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 
 - **Common causes:** the page crashed (out of memory on very long pages); the browser was closed by something else.
 - **What to do:** run again with `-v`. If it repeats on the same page, open an issue with the log and the scenario.
+- **Developers:** "Connection reset without closing handshake" or "Session with given id not found" while several browsers run at once used to mean two of them shared one profile folder (`crates/sr-browser/src/process.rs` → `claim_profile_dir`, test `launches_in_the_same_clock_tick_never_share_a_profile_folder`).
 
 ## SR-3004
 

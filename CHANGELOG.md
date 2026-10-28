@@ -9,6 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 - Five new test sites: CSS animations, GSAP + ScrollTrigger, Lenis smooth scroll, a React app, and a page with video, Lottie, canvas/WebGL and an animated GIF. Each one now renders smoothly and gives exactly the same frames twice. Example scenarios for them are in `examples/` (02–06).
 
 ### Fixed
+- When two browsers started at the very same moment (for example several renders at once), both could end up controlling one browser, and whichever finished first closed it under the other: the other one stopped with error SR-3003 ("connection reset" or "session not found"). Each browser now always gets its own private folder.
 - On computers without a graphics card (servers, virtual machines, remote desktops), two renders of the same scenario could differ in a single pixel row at the edge of an element that slides in (seen with GSAP cards on the Windows test server). The browser reused leftover picture memory there; ScrollRecord now tells it to reuse only memory of exactly the right size, which makes the frames repeatable.
 - Cards that are "paused until they come into view" (a very common CSS trick) stayed invisible in videos. They now play when they appear.
 - Native CSS scroll animations (`animation-timeline`) froze; they now follow the scroll.

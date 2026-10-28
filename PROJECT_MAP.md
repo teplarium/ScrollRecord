@@ -185,6 +185,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | Cursor moves robotically / too fast | `sr-timeline/src/cursor.rs` constants (Fitts timing, reaction, overshoot); scenario `cursor.speed`, `cursor.seed` |
 | `SR-6001` / `SR-6002` cursor pack | `sr-cursor` (`CursorPack::load`, `manifest.rs` checks, `parse_svg`); run `scrollrecord validate` |
 | `SR-2001` / `SR-2002` scenario errors | `sr-core/src/flow/` (`mod.rs` parsing, `path.rs` checks). Run `scrollrecord validate` |
+| `SR-3003` "Connection reset without closing handshake" / "Session with given id not found" while several browsers run at once (parallel tests, renders) | Two browsers on one profile folder (Chrome exit code 21 = handed over to the browser already using that folder): `process.rs` → `claim_profile_dir`; test `launches_in_the_same_clock_tick_never_share_a_profile_folder` |
 | `SR-3001`–`SR-3005` browser problems | `sr-browser` (`locate.rs`, `process.rs`, `cdp.rs`, `page.rs`); run with `-v` |
 | `SR-5001` / `SR-5002` encoding | `sr-encoder` (`find_ffmpeg` / `ffmpeg_candidates` search order, `ffmpeg_args`); `detail` param has ffmpeg's output |
 | `render.bat` / CLI package problems | `packaging/cli/`, `scripts/package-cli.sh`, CI job `cli` |
@@ -206,7 +207,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|---|
 | App log files (`scrollrecord.YYYY-MM-DD.log`, last 14 kept) | `%LOCALAPPDATA%\io.github.teplarium.scrollrecord\logs\` | `~/.local/share/io.github.teplarium.scrollrecord/logs/` |
 | CLI log files | only with `--log-dir <DIR>` | same |
-| Temporary browser profile (deleted after each render) | `%TEMP%\scrollrecord-browser-<pid>-<n>\` | `/tmp/scrollrecord-browser-<pid>-<n>/` |
+| Temporary browser profile (deleted after each render) | `%TEMP%\scrollrecord-browser-<pid>-<time>-<n>\` | `/tmp/scrollrecord-browser-<pid>-<time>-<n>/` |
 | Render output (CLI default) | `renders\` next to the scenario file | same |
 | UI preferences (language) | WebView local storage | WebView local storage |
 
