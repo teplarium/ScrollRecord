@@ -39,8 +39,9 @@ pub struct RenderArgs {
     /// Show the browser window while rendering (debugging).
     #[arg(long)]
     pub headful: bool,
-    /// Run the browser and ffmpeg at normal priority. By default they run
-    /// below normal, so the computer stays responsive; the video is the same.
+    /// Run the browser and ffmpeg at normal priority. By default ffmpeg (and
+    /// on Windows the browser) runs below normal, so the computer stays
+    /// responsive; the video is the same.
     #[arg(long)]
     pub normal_priority: bool,
     /// Print a JSON report at the end.

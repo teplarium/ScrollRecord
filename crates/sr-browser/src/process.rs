@@ -24,11 +24,11 @@ pub struct LaunchOptions {
     /// Start the browser below normal priority (default), so a render does
     /// not make the computer sluggish. Frames stay identical, only slower
     /// when other programs want the CPU (HANDOFF §14.1).
-    /// Limit on Windows: Chrome sets the priority of its tab processes
-    /// (normal) and GPU process (above normal) itself; only the main
-    /// process (which also encodes the screenshots) and its helpers stay
-    /// below normal. On Unix every child inherits the niceness and cannot
-    /// lower it without admin rights.
+    /// **Windows only** (ADR 0005): Chrome then raises its tab (normal) and
+    /// GPU process (above normal) itself; the main process (which also
+    /// encodes the screenshots) and its helpers stay below normal. On Linux
+    /// and macOS the browser always runs at normal priority, because a
+    /// niced Chrome could miss its startup limit on a busy machine.
     pub low_priority: bool,
 }
 
@@ -235,10 +235,15 @@ fn needs_no_sandbox() -> bool {
 // processes again (measured 2026-10-28: tab normal, GPU above normal; no
 // command-line switch prevents that). They did about 17 % of a 4K render's
 // CPU work; ffmpeg and Chrome's main process, which stay low, about 65 %.
-// Unix: low priority means starting through `nice -n 10`. `nice` replaces
-// itself with the browser (exec), so the process id stays the browser's.
-// Without `nice` the browser simply runs at normal priority.
-// (sr-encoder starts ffmpeg the same way.)
+// Unix: the browser always starts at normal priority (`low_priority` is
+// ignored). Started through `nice -n 10`, Chrome did not open its DevTools
+// port within 30 s on GitHub's Linux runner (all four browser tests, run
+// #11), while at normal priority it always had; in a clean Ubuntu container
+// a niced Chrome started 4–6× slower once other programs kept every core
+// busy. Lowering the priority only after startup would need unsafe system
+// calls or a separate process group (then Ctrl+C would leave Chrome
+// running), so Linux keeps the reliable start (ADR 0005). sr-encoder still
+// starts ffmpeg through `nice`: nothing waits on ffmpeg with a time limit.
 #[cfg(windows)]
 fn background_command(program: &Path, low_priority: bool) -> Command {
     use std::os::windows::process::CommandExt;
@@ -254,23 +259,8 @@ fn background_command(program: &Path, low_priority: bool) -> Command {
 }
 
 #[cfg(not(windows))]
-fn background_command(program: &Path, low_priority: bool) -> Command {
-    match low_priority.then(find_nice).flatten() {
-        Some(nice) => {
-            let mut cmd = Command::new(nice);
-            cmd.args(["-n", "10"]).arg(program);
-            cmd
-        }
-        None => Command::new(program),
-    }
-}
-
-#[cfg(not(windows))]
-fn find_nice() -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|dir| dir.join("nice"))
-        .find(|p| p.is_file())
+fn background_command(program: &Path, _low_priority: bool) -> Command {
+    Command::new(program)
 }
 
 // ── Profile folder ──────────────────────────────────────────────────────────

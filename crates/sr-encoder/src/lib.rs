@@ -505,10 +505,13 @@ fn ffmpeg_args(s: &EncodeSettings, width: u32, height: u32) -> Vec<String> {
 }
 
 // ── Starting ffmpeg: no console window, optionally low priority ─────────────
-// Same rules as the browser (sr-browser `process.rs` → `background_command`):
-// Windows uses CREATE_NO_WINDOW (+ BELOW_NORMAL_PRIORITY_CLASS); Unix starts
-// through `nice -n 10` when `nice` exists. Kept as a copy because sr-core
-// does no IO and the two crates must not depend on each other.
+// Windows uses CREATE_NO_WINDOW (+ BELOW_NORMAL_PRIORITY_CLASS), like the
+// browser (sr-browser `process.rs` → `background_command`). Unix starts
+// through `nice -n 10` when `nice` exists; unlike the browser (which stays at
+// normal priority on Unix, ADR 0005) this is safe, because nothing waits on
+// ffmpeg with a time limit: a busy machine only makes encoding slower.
+// Kept as a copy because sr-core does no IO and the two crates must not
+// depend on each other.
 #[cfg(windows)]
 fn background_command(program: &Path, low_priority: bool) -> Command {
     use std::os::windows::process::CommandExt;

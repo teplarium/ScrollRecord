@@ -373,11 +373,14 @@ fn software_frames_do_not_depend_on_leftover_tile_memory() {
     browser.close();
 }
 
-/// A render must not make the computer sluggish: by default the browser
-/// runs below normal priority (HANDOFF §14.1); turned off, it gets the same
-/// priority as the program that started it.
+/// A render must not make the computer sluggish: on Windows the browser
+/// runs below normal priority by default (HANDOFF §14.1); turned off, it
+/// gets the same priority as the program that started it.
+/// On Linux/macOS it must keep the starter's priority even by default: a
+/// niced Chrome missed its 30 s startup limit on GitHub's Linux runner
+/// (ADR 0005), so this fails if `nice` comes back there.
 #[test]
-fn browser_runs_below_normal_priority_unless_turned_off() {
+fn browser_priority_is_lowered_only_on_windows() {
     let own = priority(std::process::id());
     let Some(low) = start() else {
         return;
@@ -385,10 +388,9 @@ fn browser_runs_below_normal_priority_unless_turned_off() {
     let expected = if cfg!(windows) {
         "BelowNormal".to_owned()
     } else {
-        let own: i32 = own.parse().expect("niceness");
-        (own + 10).min(19).to_string()
+        own.clone()
     };
-    assert_eq!(priority(low.pid()), expected, "default: low priority");
+    assert_eq!(priority(low.pid()), expected, "default");
     low.close();
 
     let normal = start_custom(|o| o.low_priority = false).expect("browser");

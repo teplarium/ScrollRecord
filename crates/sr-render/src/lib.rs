@@ -52,7 +52,8 @@ pub struct RenderOptions {
     /// Run the browser and ffmpeg below normal priority (default), so the
     /// computer stays responsive while rendering. Frames are identical
     /// either way; a low-priority render is only slower when other programs
-    /// are busy (HANDOFF §14.1).
+    /// are busy (HANDOFF §14.1). The browser part applies on Windows only
+    /// (ADR 0005); ffmpeg is lowered everywhere.
     pub low_priority: bool,
 }
 
