@@ -3,6 +3,7 @@
 Working document shared by Claude Code sessions (see CLAUDE.md). Keep it short: tick items, keep "Next session starts here" current, move details into code, ADRs and PROJECT_MAP.
 
 **Goal (HANDOFF §14):** the Phase 1 scenario (`examples/01-plain-landing.srflow.json`) is built with the mouse in a couple of minutes.
+**Architecture:** ADR 0006 (read it before any Phase 3 step).
 **Requirements:** HANDOFF §5.1 (FR-PRJ), §5.2 (FR-SRC-01/02, FR-VP), §5.3 (FR-CNV), §5.4 (FR-BLK, FR-NAV shapes only), §5.5 (FR-ANC), §5.9 (FR-RND, FR-PRV), §5.11 (FR-I18N), §6 (NFR-02, NFR-05), §7.4 (why cards are snapshots).
 **Already decided:** D-01 Tauri v2 · D-02 React + TS + Vite · D-03 React Flow (`@xyflow/react`, MIT; not tldraw) · D-05 snapshot cards + one live block · D-10/D-17/D-18 types from Rust via ts-rs, contract in `sr-ipc` · D-12 i18next · state: Zustand + undo/redo (HANDOFF §7.6).
 **Starting point:** the desktop app shows a start screen; `create_project` / `open_project` answer SR-0002 "planned". `sr-render::Renderer` renders from the CLI with a progress callback, but has no cancel and no events for a UI.
@@ -10,7 +11,8 @@ Working document shared by Claude Code sessions (see CLAUDE.md). Keep it short: 
 ## Next session starts here
 Steps 1b-fix and **1c are done** (1c on 2026-10-28: stage timings in the render report, ffmpeg and — on Windows — Chrome below normal priority; numbers and the GPU-encoding verdict in HANDOFF §14.1 — postponed, it would not speed renders up). CI run #11 failed on Linux because Chrome was started through `nice`; fixed the same day (step 1c, "CI fix", ADR 0005). Waiting for the owner's push and a green CI run on both OSes. Linux can be reproduced locally: Podman container `ubuntu:24.04` + Google Chrome (see the Claude Code memory note). If a later CI run shows "renders differ", its message says where the frames differ (`heavy_sites.rs` → `Pixels::difference`).
 The repository lives at `E:\Проекты\ScrollRecord` (NVMe, Cyrillic kept for NFR-02).
-Next work: Phase 3 **beginning with step 3.0.** Carry into 3.0/3.7: render targets in parallel (1c showed the CPU mostly idle). The other ideas the owner accepted for later (GPU video encoding, cache limits, audio) are in HANDOFF §14.1; only the cache note belongs to step 3.0.
+**Step 3.0 is done** (2026-10-28): ADR 0006 "Editor architecture" is accepted, with the owner's answers at its end, and the steps below are re-split.
+Next work: **step 3.1a** (crate `sr-project`, scenario types to TypeScript, project commands) in a new session. Carry into 3.7: render targets in parallel (1c showed the CPU mostly idle). The other ideas the owner accepted for later (GPU video encoding, audio) are in HANDOFF §14.1.
 This PC has Rust 1.97 (`%USERPROFILE%\.cargo\bin`, prefix PATH in PowerShell), VS 2022 Build Tools and pnpm (via corepack). Google Chrome 155 is installed and is the browser the tests use.
 
 ## Steps
@@ -38,28 +40,35 @@ HANDOFF §14.1 ("step 0" of GPU encoding, and lower render priority). CLI/core o
 - [x] **CI fix (run #11, commit `b584b56`):** on `Rust (ubuntu-24.04)` all four `sr-browser/tests/browser.rs` tests failed: "browser did not open its DevTools port within 30s" — the first run with Chrome started through `nice` (run #10 without it was green). Reproduced in a Podman container (Ubuntu 24.04 + Chrome 156, as a non-root user): a niced Chrome starts fine when idle, but 4–6× slower once normal-priority programs keep every core busy; the runner's exact load could not be reproduced. Lowering only after startup needs unsafe calls or a separate process group (Ctrl+C would orphan Chrome). **Decision (ADR 0005):** the browser is lowered on Windows only; ffmpeg stays niced on Unix (nothing waits on it with a time limit). Test renamed to `browser_priority_is_lowered_only_on_windows`; on Linux it fails if `nice` comes back. (owner) Push and check both CI jobs.
 - Side finding, not fixed: 9:16 at 4K on `iphone-15` gives 2160×3842, not 2160×3840 (`sr-core/src/flow/target.rs` → `geometry` derives the output height from the rounded CSS height). Plays fine; fix only together with a decision on crop vs. slight stretch.
 
-### 3.0 Architecture and questions — 1 session
-- [ ] Read the desktop shell (`apps/desktop/src/`, `apps/desktop/src-tauri/src/`), `crates/sr-ipc`, the public API of `crates/sr-render`.
-- [ ] ADR 0006 "Editor architecture" (0005 is render priority, from 1c): project folder format and where its logic lives (proposal: new crate `sr-project`, all file IO there); editor state (Zustand store of Flow + layout, undo/redo as a command history); IPC commands vs events (render progress, preview frames); long jobs off the UI thread with cancel; how page snapshots/tiles are made and cached (proposal: new crate `sr-analyzer`, HANDOFF §7.5). Cache rule from the owner (HANDOFF §14.1): recent snapshots in RAM under a hard limit, the rest on disk in the project folder; no RAM disk.
-- [ ] Adjust steps 3.1–3.9 if the code suggests a better split.
-- [ ] Ask the owner the open questions in one message (e.g. default folder for new projects).
+### 3.0 Architecture and questions — 1 session ✅ 2026-10-28
+- [x] Read the desktop shell (`apps/desktop/src/`, `apps/desktop/src-tauri/src/`), `crates/sr-ipc`, the public API of `crates/sr-render`. Found: only `AppInfo`/`AppError`/`ErrorCode` reach TypeScript; no React Flow, Zustand or file dialog yet; `Flow` already has an optional `layout` field.
+- [x] ADR 0006 "Editor architecture" (accepted): `sr-project` crate + folder format + atomic writes + recent list in Rust; `sr-core::flow` types exported with ts-rs; validation stays in Rust (`validate_flow` → issues per node); Zustand document store + view store + own undo history; async commands; long jobs = job id + Tauri `Channel` + cancel flag (`src-tauri/src/jobs.rs`); `sr-analyzer` tiles on disk in `cache/`, served by a custom `sr-tile://` protocol, RAM hard limit in the UI. New deps: `tauri-plugin-dialog` (3.1), `@xyflow/react` + `zustand` (3.2), `tauri-plugin-opener` (3.7).
+- [x] Steps re-split (owner agreed 2026-10-28): projects first, then the canvas in two parts — "see" before "edit" — so the owner can judge the canvas early.
+- [x] (owner) Answered the 5 questions (2026-10-28, end of ADR 0006): user picks the folder (first suggestion `Documents\ScrollRecord\`, then the last one used); autosave, no Save button; empty name → "Untitled N"; canvas follows the system theme; cache keeps 2 snapshot versions + "Clear cache". New idea for later: "Export project" for another computer (HANDOFF §14.1).
 
-### 3.1 Projects — FR-PRJ-01…04, FR-SRC-01/02 — 1–2 sessions
-- [ ] Project folder: `project.json`, `flow.srflow.json`, `layout.json`, `cache/`, `renders/`. Create / open / save with atomic writes. Test with a Cyrillic path like `D:\Загрузки\…` (NFR-02).
-- [ ] Start screen works: new, open, recent projects (replace SR-0002).
-- [ ] Site source: folder or URL. Import an existing `*.srflow.json`, export the scenario.
-- [ ] Autosave and recovery after a crash (FR-PRJ-02).
-- [ ] (owner) Create a project for `tests/fixtures/sites/01-plain-landing`, close the app, reopen the project.
+### 3.1 Projects — FR-PRJ-01…04, FR-SRC-01/02 — 2 sessions
+**3.1a Rust side (1 session)**
+- [ ] New crate `sr-project` (ADR 0006 §1): `project.json`, `flow.srflow.json`, `layout.json`, `cache/`, `renders/`; create / open / save with atomic writes (`.tmp` → rename, `.bak` kept); lock file; recent list + last location used, in the app config folder. Default name "Untitled N" (smallest free N in the chosen folder); first suggested location `Documents\ScrollRecord\`. Keep paths portable (relative `meta.site` when possible) for the later "Export project". Tests incl. a Cyrillic path (NFR-02), a project next to its site folder, and "Untitled 1/2/3" numbering with gaps.
+- [ ] `sr-core::flow` types → TypeScript (ts-rs, `#[ts(type = …)]` for custom serde forms); a test that a parsed example round-trips through JSON unchanged.
+- [ ] Import a `*.srflow.json` (its `layout` → `layout.json`) and export one (layout embedded).
+- [ ] Async Tauri commands `create_project`, `open_project`, `save_project`, `recent_projects`, `import_flow`, `export_flow` + wrappers in `commands.ts`; new error codes (not a project / newer format / locked / site folder missing) with ERRORS.md + `en/common.json`.
+**3.1b Start screen (1 session)**
+- [ ] `tauri-plugin-dialog` for folder/file pickers. Start screen: new project form (name — empty means "Untitled N"; location with "Choose…", first `Documents\ScrollRecord\` then the last one used; site folder or URL; empty scenario or import), open, recent list (missing folders shown and removable).
+- [ ] App switches to an editor placeholder showing the project name and site; autosave wiring comes with the store in 3.3.
+- [ ] (owner) Create a project for `tests/fixtures/sites/01-plain-landing`, close the app, reopen it from the recent list.
 
-### 3.2 Editor screen and state — 1 session
-- [ ] Layout: canvas · properties panel · top bar (device switcher, targets, Render button).
-- [ ] Store: Flow + layout, undo/redo of every edit (FR-PRJ-05), dirty flag → autosave.
-- [ ] Validation from Rust (`sr-core` plan/validate) as an IPC command returning issues per node; problem nodes highlighted (FR-CNV-09).
+### 3.2 Canvas, part 1 — see the scenario — FR-CNV-01, -07, -08 (display), -12 — 1 session
+- [ ] Editor screen layout: top bar (project name, device switcher, Render button placeholder) · canvas · properties panel (empty for now).
+- [ ] React Flow (`@xyflow/react`): pan, zoom, "fit all", minimap. Node types: Start/End oval, Block card (plain), Navigate shape (drawing only; navigation itself is Phase 4). Arrows from the scenario's edges.
+- [ ] Own auto-layout for scenarios without layout (column in path order, branches offset) (FR-CNV-12). Stays smooth with 200+ nodes (NFR-05): a generated 250-node test scenario.
+- [ ] (owner) Open the example 01 project: the scenario appears as a chain Start → hero → … → End; zoom, pan, minimap work.
 
-### 3.3 Canvas: nodes and arrows — FR-CNV-01, -07, -08, -12 — 1–2 sessions
-- [ ] React Flow: pan, zoom, fit, minimap. Start/End ovals, Block cards (plain for now), Navigate shape (drawing only; navigation itself is Phase 4).
-- [ ] Arrows between nodes; create from toolbar and shortcuts; delete; edges carry scroll/cursor settings.
-- [ ] Auto-layout for scenarios without `layout` (FR-CNV-12). Stays smooth with 200+ nodes (NFR-05).
+### 3.3 Canvas, part 2 — edit — FR-CNV-07, -08, -09, FR-PRJ-02, -05 — 1–2 sessions
+- [ ] `shared/store`: document store `{flow, layout}` + view store (selection, zoom, device) + own undo history (ADR 0006 §3) with unit tests (drag = one step, typing coalesced, 200-step cap).
+- [ ] Create nodes from the toolbar and shortcuts, connect / delete arrows and nodes, move nodes (positions → `layout.json`); Ctrl+Z / Ctrl+Shift+Z.
+- [ ] Autosave (per owner answer 2) + save on close; lock-file warning.
+- [ ] `sr-core` issues get node/edge ids; command `validate_flow`; problem nodes highlighted with the message on hover (FR-CNV-09).
+- [ ] (owner) Add a block, connect it, undo/redo, close and reopen: the change is there.
 
 ### 3.4 Properties panel and targets — FR-CNV-10, FR-BLK-01/02/04/05, FR-ANC, FR-VP — 1–2 sessions
 - [ ] Block: target locators, align + offset, `hold_ms`; actions list (hover / click / move / wait: delay, duration, mode, only/except).
@@ -67,18 +76,19 @@ HANDOFF §14.1 ("step 0" of GPU encoding, and lower render priority). CLI/core o
 - [ ] Scenario defaults (cursor pack, seed, scroll) and targets (device presets, aspect, resolution, fps, format); per-device overrides.
 
 ### 3.5 Page boards and block cards — FR-CNV-02, -04, -11 — 2 sessions
-- [ ] `sr-analyzer`: open the page exactly like the renderer (same Chromium, emulation, prepare), full-page screenshot cut into tiles with levels of detail, DOM boxes of elements; cached in the project's `cache/` per site + device.
-- [ ] Page board on the canvas (tiles load only where visible); block cards show the crop of their section; switching the device re-measures.
-- [ ] Watch WebKitGTK performance with big images (HANDOFF risk 4) — CI only, unless the owner has Linux.
+- [ ] `sr-analyzer` (ADR 0006 §5): open the page exactly like the renderer (same Chromium, emulation, prepare), full-page screenshot cut into tiles with levels of detail, DOM boxes of elements; cached in the project's `cache/<page>/<device>/<fingerprint>/`, last 2 fingerprints kept.
+- [ ] First long job: `src-tauri/src/jobs.rs` (job id, `Channel` progress, cancel flag) + "Cancelled" error code.
+- [ ] `sr-tile://` protocol serving only the open project's `cache/`. Page board on the canvas (tiles load only where visible, RAM hard limit); block cards show the crop of their section; switching the device re-measures.
+- [ ] Watch WebKitGTK performance with big images (HANDOFF risk 4): CI, and the Podman Linux container (memory note).
 
 ### 3.6 Inspector mode — FR-CNV-03 — 1 session
 - [ ] Hover on a board highlights elements (boxes from 3.5, no live DOM); click creates a block with generated locators (`data-sr` first, then id / CSS / text).
 
 ### 3.7 Render queue and dry run — FR-RND-02/03/04 — 1–2 sessions
 (From 1c: try rendering 2–3 targets at the same time; one render keeps only ≈ 1.3 of 12 cores busy. Show `RenderReport.stages` in the queue.)
-- [ ] All targets with one button; progress as IPC events; cancel; one failing target does not stop the others; file name template `{project}_{target}_{date}`; open the output folder.
+- [ ] All targets with one button; progress over the job `Channel` (ADR 0006 §4); cancel; one failing target does not stop the others; file name template `{project}_{target}_{date}`; open the output folder (`tauri-plugin-opener`).
 - [ ] Dry run: check every locator on every device without recording.
-- [ ] `sr-render` gets cancel + progress events; the CLI keeps working the same (NFR-09).
+- [ ] `sr-render` gets a cancel flag checked once per frame; the CLI keeps working the same (NFR-09).
 
 ### 3.8 Preview — FR-PRV-01 — 1 session
 - [ ] Low-quality real-time frame stream of the scenario in the app (CDP screencast, ADR 0002 option 1).

@@ -117,7 +117,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `docs/phase-3-plan.md` | Phase 3 steps, progress and "Next session starts here" (memory between AI sessions) |
 | `CONTRIBUTING.md` | Dev setup, workflow, recipes |
 | `docs/ERRORS.md` | Error catalog: one `## SR-xxxx` section per code |
-| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server), `0005` render priority (browser lowered on Windows only) |
+| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server), `0005` render priority (browser lowered on Windows only), `0006` editor architecture (Phase 3: project folder, state, IPC jobs, tiles) |
 | `.github/` | CI (Rust + UI on Windows & Linux; artifacts: CLI package + installers), issue forms |
 | `.cargo/config.toml` | Where ts-rs writes TypeScript bindings |
 | `rust-toolchain.toml` | Pinned Rust version (1.97.0) |
@@ -239,3 +239,4 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-25 | Phase 1b: fixtures `02`–`06` (+ `vendor/` folders), `sr-render/tests/heavy_sites.rs`, examples `02`–`06`; `runtime.js` animation control reworked (ADR 0004), media/animated-image/scroll-event/framework-task handling; `sr-site` server rewritten on std (tiny_http removed): ranges, clean URLs, SPA fallback; ADR 0004 |
 | 2026-10-25 | `CLAUDE.md` rewritten for Claude Code sessions; `docs/phase-3-plan.md` added (Phase 3 started) |
 | 2026-10-28 | Step 1c: `RenderReport.stages` (`StageTimings`), `CaptureStats` times; `low_priority` in `LaunchOptions` / `EncodeSettings` / `RenderOptions`, `Browser::pid()`; CLI `--normal-priority`; ADR 0005 |
+| 2026-10-28 | Step 3.0: ADR 0006 (editor architecture, accepted with the owner's answers); Phase 3 steps re-split in `docs/phase-3-plan.md`. No code changes |
