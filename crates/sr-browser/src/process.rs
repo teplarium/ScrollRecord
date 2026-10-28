@@ -21,6 +21,15 @@ pub struct LaunchOptions {
     pub extra_args: Vec<String>,
     /// How long to wait for the browser to open its DevTools port.
     pub startup_timeout: Duration,
+    /// Start the browser below normal priority (default), so a render does
+    /// not make the computer sluggish. Frames stay identical, only slower
+    /// when other programs want the CPU (HANDOFF §14.1).
+    /// Limit on Windows: Chrome sets the priority of its tab processes
+    /// (normal) and GPU process (above normal) itself; only the main
+    /// process (which also encodes the screenshots) and its helpers stay
+    /// below normal. On Unix every child inherits the niceness and cannot
+    /// lower it without admin rights.
+    pub low_priority: bool,
 }
 
 impl Default for LaunchOptions {
@@ -29,6 +38,7 @@ impl Default for LaunchOptions {
             headless: true,
             extra_args: Vec::new(),
             startup_timeout: Duration::from_secs(30),
+            low_priority: true,
         }
     }
 }
@@ -52,12 +62,11 @@ impl BrowserProcess {
         })?;
         let stderr_log = std::fs::File::create(profile_dir.join("browser-stderr.log")).ok();
 
-        let mut cmd = Command::new(executable);
+        let mut cmd = background_command(executable, opts.low_priority);
         cmd.args(flags(&profile_dir, opts))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(stderr_log.map_or_else(Stdio::null, Stdio::from));
-        hide_console_window(&mut cmd);
 
         let child = cmd.spawn().map_err(|err| {
             AppError::new(
@@ -109,6 +118,11 @@ impl BrowserProcess {
                 self.stderr_tail()
             ),
         ))
+    }
+
+    /// Process id of the browser (its main process).
+    pub fn pid(&self) -> u32 {
+        self.child.id()
     }
 
     /// Last lines the browser wrote to stderr (for error messages).
@@ -214,16 +228,50 @@ fn needs_no_sandbox() -> bool {
     false
 }
 
-/// On Windows, child processes of a GUI app would flash a console window.
+// ── Starting the process: no console window, optionally low priority ────────
+// Windows: a child of a GUI app would flash a console window, so it gets
+// CREATE_NO_WINDOW; low priority is BELOW_NORMAL_PRIORITY_CLASS. Chrome's
+// own child processes start with it, but Chrome raises its tab and GPU
+// processes again (measured 2026-10-28: tab normal, GPU above normal; no
+// command-line switch prevents that). They did about 17 % of a 4K render's
+// CPU work; ffmpeg and Chrome's main process, which stay low, about 65 %.
+// Unix: low priority means starting through `nice -n 10`. `nice` replaces
+// itself with the browser (exec), so the process id stays the browser's.
+// Without `nice` the browser simply runs at normal priority.
+// (sr-encoder starts ffmpeg the same way.)
 #[cfg(windows)]
-fn hide_console_window(cmd: &mut Command) {
+fn background_command(program: &Path, low_priority: bool) -> Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    cmd.creation_flags(CREATE_NO_WINDOW);
+    const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(if low_priority {
+        CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS
+    } else {
+        CREATE_NO_WINDOW
+    });
+    cmd
 }
 
 #[cfg(not(windows))]
-fn hide_console_window(_cmd: &mut Command) {}
+fn background_command(program: &Path, low_priority: bool) -> Command {
+    match low_priority.then(find_nice).flatten() {
+        Some(nice) => {
+            let mut cmd = Command::new(nice);
+            cmd.args(["-n", "10"]).arg(program);
+            cmd
+        }
+        None => Command::new(program),
+    }
+}
+
+#[cfg(not(windows))]
+fn find_nice() -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join("nice"))
+        .find(|p| p.is_file())
+}
 
 // ── Profile folder ──────────────────────────────────────────────────────────
 // Each browser needs a folder no other browser uses. Chrome allows one running

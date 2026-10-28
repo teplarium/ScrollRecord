@@ -144,7 +144,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `Compositor`, `Composed` | `sr-compositor/src/lib.rs` | Cursor onto frames |
 | `FrameSink`, `CapturedFrame`, `capture()`, `Progress` | `sr-capture/src/lib.rs` | Frame loop |
 | `VideoSink`, `FfmpegEncoder`, `PngSequence`, `EncodeSettings`, `Quality` | `sr-encoder/src/lib.rs` | Output |
-| `Renderer`, `RenderOptions`, `RenderReport` | `sr-render/src/lib.rs` | Whole pipeline |
+| `Renderer`, `RenderOptions`, `RenderReport`, `StageTimings` | `sr-render/src/lib.rs` | Whole pipeline; per-stage busy times in the report (`CaptureStats` in `sr-capture` measures the frame loop) |
 | `AppInfo` | `sr-ipc/src/app_info.rs` | Versions for UI/bug reports |
 | `IpcResult<T>`, `commands` | `apps/desktop/src/shared/ipc/commands.ts` | UI → Rust calls |
 
@@ -188,6 +188,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `SR-3003` "Connection reset without closing handshake" / "Session with given id not found" while several browsers run at once (parallel tests, renders) | Two browsers on one profile folder (Chrome exit code 21 = handed over to the browser already using that folder): `process.rs` → `claim_profile_dir`; test `launches_in_the_same_clock_tick_never_share_a_profile_folder` |
 | `SR-3001`–`SR-3005` browser problems | `sr-browser` (`locate.rs`, `process.rs`, `cdp.rs`, `page.rs`); run with `-v` |
 | `SR-5001` / `SR-5002` encoding | `sr-encoder` (`find_ffmpeg` / `ffmpeg_candidates` search order, `ffmpeg_args`); `detail` param has ffmpeg's output |
+| Render is slow — which stage? | CLI prints `stages:` lines after each target (`--json`: `stages`). Measured in `sr-render` → `render` / `CompositeSink` worker and `sr-capture` → `capture` (`CaptureStats`). High "waiting for the worker" = cursor drawing or encoding is the bottleneck |
+| Computer sluggish while rendering, or render much slower than before | Chrome and ffmpeg run below normal priority by default: `background_command` in `sr-browser/src/process.rs` and `sr-encoder/src/lib.rs` (Windows `BELOW_NORMAL_PRIORITY_CLASS`, Unix `nice -n 10`); CLI `--normal-priority` turns it off; test `browser_runs_below_normal_priority_unless_turned_off` |
 | `render.bat` / CLI package problems | `packaging/cli/`, `scripts/package-cli.sh`, CI job `cli` |
 | `SR-8001`–`SR-8003` site | `sr-site` (`SiteSource::parse`, `server.rs`) |
 | Wrong video size / aspect | `sr-core/src/flow/target.rs` → `Target::geometry`; ffmpeg `-s` (input) and `scale=` (output) in `sr-encoder` |
@@ -235,3 +237,4 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-25 | Phase 2: `sr-core` `flow/action.rs`, `flow/cursor.rs`; `sr-timeline/src/cursor.rs`; new crates `sr-cursor` (with `packs/`), `sr-compositor`; `sr-capture` `FrameSink` takes `CapturedFrame`; `sr-encoder` `VideoSink` takes raw RGBA (no longer depends on `sr-capture`); `sr-browser` pointer input + probe; codes SR-6001/6002; ADR 0003 |
 | 2026-10-25 | Phase 1b: fixtures `02`–`06` (+ `vendor/` folders), `sr-render/tests/heavy_sites.rs`, examples `02`–`06`; `runtime.js` animation control reworked (ADR 0004), media/animated-image/scroll-event/framework-task handling; `sr-site` server rewritten on std (tiny_http removed): ranges, clean URLs, SPA fallback; ADR 0004 |
 | 2026-10-25 | `CLAUDE.md` rewritten for Claude Code sessions; `docs/phase-3-plan.md` added (Phase 3 started) |
+| 2026-10-28 | Step 1c: `RenderReport.stages` (`StageTimings`), `CaptureStats` times; `low_priority` in `LaunchOptions` / `EncodeSettings` / `RenderOptions`, `Browser::pid()`; CLI `--normal-priority` |

@@ -48,6 +48,9 @@ pub struct EncodeSettings {
     pub format: OutputFormat,
     /// Speed/size trade-off.
     pub quality: Quality,
+    /// Run ffmpeg below normal priority, so encoding does not make the
+    /// computer sluggish (HANDOFF §14.1). The video is the same either way.
+    pub low_priority: bool,
 }
 
 /// Receives finished frames in order.
@@ -295,13 +298,12 @@ impl FfmpegEncoder {
 
     fn spawn(&mut self, width: u32, height: u32) -> AppResult<()> {
         let (exe, output) = (self.exe.clone(), self.output.clone());
-        let mut cmd = Command::new(&exe);
+        let mut cmd = background_command(&exe, self.settings.low_priority);
         cmd.args(ffmpeg_args(&self.settings, width, height))
             .arg(&output)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
-        hide_console_window(&mut cmd);
         let mut child = cmd.spawn().map_err(|err| {
             AppError::new(
                 ErrorCode::FfmpegNotFound,
@@ -502,15 +504,44 @@ fn ffmpeg_args(s: &EncodeSettings, width: u32, height: u32) -> Vec<String> {
     a
 }
 
+// ── Starting ffmpeg: no console window, optionally low priority ─────────────
+// Same rules as the browser (sr-browser `process.rs` → `background_command`):
+// Windows uses CREATE_NO_WINDOW (+ BELOW_NORMAL_PRIORITY_CLASS); Unix starts
+// through `nice -n 10` when `nice` exists. Kept as a copy because sr-core
+// does no IO and the two crates must not depend on each other.
 #[cfg(windows)]
-fn hide_console_window(cmd: &mut Command) {
+fn background_command(program: &Path, low_priority: bool) -> Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    cmd.creation_flags(CREATE_NO_WINDOW);
+    const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+    let mut cmd = Command::new(program);
+    cmd.creation_flags(if low_priority {
+        CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS
+    } else {
+        CREATE_NO_WINDOW
+    });
+    cmd
 }
 
 #[cfg(not(windows))]
-fn hide_console_window(_cmd: &mut Command) {}
+fn background_command(program: &Path, low_priority: bool) -> Command {
+    let nice = low_priority
+        .then(|| std::env::var_os("PATH"))
+        .flatten()
+        .and_then(|path| {
+            std::env::split_paths(&path)
+                .map(|dir| dir.join("nice"))
+                .find(|p| p.is_file())
+        });
+    match nice {
+        Some(nice) => {
+            let mut cmd = Command::new(nice);
+            cmd.args(["-n", "10"]).arg(program);
+            cmd
+        }
+        None => Command::new(program),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -523,7 +554,25 @@ mod tests {
             fps: 60,
             format,
             quality: Quality::Fast,
+            low_priority: true,
         }
+    }
+
+    /// The OS priority of a process: the Windows priority class
+    /// ("Normal", "BelowNormal") or the Unix niceness ("0", "10").
+    fn priority(pid: u32) -> String {
+        let out = if cfg!(windows) {
+            Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command"])
+                .arg(format!("(Get-Process -Id {pid}).PriorityClass"))
+                .output()
+        } else {
+            Command::new("ps")
+                .args(["-o", "ni=", "-p", &pid.to_string()])
+                .output()
+        }
+        .unwrap();
+        String::from_utf8_lossy(&out.stdout).trim().to_owned()
     }
 
     #[test]
@@ -588,6 +637,16 @@ mod tests {
         for i in 0..5u32 {
             enc.push(i, 64, 32, &[128; 64 * 32 * 4]).unwrap();
         }
+        // ffmpeg runs below normal priority (the default), so a render
+        // leaves the computer responsive.
+        let pid = enc.child.as_ref().unwrap().id();
+        let expected = if cfg!(windows) {
+            "BelowNormal".to_owned()
+        } else {
+            let own: i32 = priority(std::process::id()).parse().unwrap();
+            (own + 10).min(19).to_string()
+        };
+        assert_eq!(priority(pid), expected, "ffmpeg priority");
         enc.finish().unwrap();
         assert!(std::fs::metadata(&out).unwrap().len() > 100);
         let _ = std::fs::remove_file(&out);

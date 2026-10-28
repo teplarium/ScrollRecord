@@ -44,10 +44,16 @@ pub struct RenderOptions {
     pub ffmpeg: Option<PathBuf>,
     /// Encoding speed/size.
     pub quality: Quality,
-    /// Browser start options.
+    /// Browser start options (`low_priority` is taken from
+    /// [`RenderOptions::low_priority`]).
     pub launch: LaunchOptions,
     /// How long a page may take to load.
     pub page_load_timeout: Duration,
+    /// Run the browser and ffmpeg below normal priority (default), so the
+    /// computer stays responsive while rendering. Frames are identical
+    /// either way; a low-priority render is only slower when other programs
+    /// are busy (HANDOFF §14.1).
+    pub low_priority: bool,
 }
 
 impl Default for RenderOptions {
@@ -59,6 +65,7 @@ impl Default for RenderOptions {
             quality: Quality::Fast,
             launch: LaunchOptions::default(),
             page_load_timeout: Duration::from_secs(45),
+            low_priority: true,
         }
     }
 }
@@ -84,8 +91,49 @@ pub struct RenderReport {
     pub fps: u32,
     /// Non-fatal notes.
     pub warnings: Vec<String>,
-    /// Wall-clock render time in seconds.
+    /// Wall-clock time of [`Renderer::render`] in seconds (browser start
+    /// not included, see [`StageTimings::browser_start_s`]).
     pub elapsed_s: f64,
+    /// Where the time went.
+    pub stages: StageTimings,
+}
+
+/// Busy time of each render stage, in seconds (HANDOFF §14.1: tells which
+/// stage to speed up, e.g. whether GPU encoding would help).
+///
+/// The stages do **not** add up to [`RenderReport::elapsed_s`]: decoding,
+/// cursor drawing and encoding run on a worker thread *alongside* the
+/// browser stages, and small steps (planning, timeline maths, writing
+/// `timeline.json`) are not listed. The stages on the render thread
+/// (`page_load_s` … `worker_wait_s`) never sum to more than `elapsed_s`.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct StageTimings {
+    /// Starting the browser. It runs once per session in
+    /// [`Renderer::start`], before any target, so it is counted in the first
+    /// target the session renders and is 0 for the rest.
+    pub browser_start_s: f64,
+    /// Opening a tab, emulating the device, loading and preparing the page,
+    /// measuring the blocks.
+    pub page_load_s: f64,
+    /// Finding the action targets once their blocks have appeared, then
+    /// reloading the page (next to nothing when no block has actions).
+    pub probe_s: f64,
+    /// Moving the page one frame forward (scroll, page time, pointer),
+    /// warm-up included.
+    pub page_step_s: f64,
+    /// Taking the screenshots.
+    pub screenshot_s: f64,
+    /// The render thread waiting for the worker: its queue of frames was
+    /// full, or the last frames and the file were still being finished.
+    /// Large means the worker stages below are the slow part.
+    pub worker_wait_s: f64,
+    /// Worker thread: decoding screenshots and drawing the cursor.
+    pub compose_s: f64,
+    /// Worker thread: handing frames to the encoder and waiting for it to
+    /// finish the file. ffmpeg works in its own process, so for video this
+    /// is the time it kept us waiting (pipe full); for PNG output it is the
+    /// PNG compression and writing.
+    pub encode_s: f64,
 }
 
 /// A started render session: the site is served and the browser is running.
@@ -98,6 +146,8 @@ pub struct Renderer {
     opts: RenderOptions,
     /// Scenario folder: relative cursor-pack folders are resolved from here.
     flow_dir: PathBuf,
+    /// Browser start time, until the first finished target reports it.
+    browser_start: Option<Duration>,
 }
 
 impl Renderer {
@@ -119,8 +169,14 @@ impl Renderer {
 
         // ── Browser ──
         let exe = sr_browser::find_browser(opts.browser.as_deref())?;
-        let mut browser = Browser::launch(&exe, &opts.launch)?;
+        let started = Instant::now();
+        let launch = LaunchOptions {
+            low_priority: opts.low_priority,
+            ..opts.launch.clone()
+        };
+        let mut browser = Browser::launch(&exe, &launch)?;
         let browser_version = browser.version().unwrap_or_else(|_| "unknown".into());
+        let browser_start = started.elapsed();
         tracing::info!(site = site.base_url(), browser = %browser_version, "render session started");
         Ok(Renderer {
             site,
@@ -128,6 +184,7 @@ impl Renderer {
             browser_version,
             opts,
             flow_dir: flow_dir.to_path_buf(),
+            browser_start: Some(browser_start),
         })
     }
 
@@ -154,6 +211,7 @@ impl Renderer {
         warnings.extend(pack.warnings.iter().cloned());
 
         // ── Page: device, load, prepare ──
+        let stage = Instant::now();
         let mut page = self.browser.new_page()?;
         page.emulate(&Emulation {
             css_width: g.css_width,
@@ -186,6 +244,8 @@ impl Renderer {
             .cloned()
             .collect();
         let mut metrics = page_metrics(page.measure(&blocks)?)?;
+        let page_load = stage.elapsed();
+        let stage = Instant::now();
         if probe_targets(&mut page, &plan, &mut metrics)? {
             // The probe scrolled and revealed things: start over from a fresh page.
             load(
@@ -196,6 +256,7 @@ impl Renderer {
                 &mut Vec::new(),
             )?;
         }
+        let probe = stage.elapsed();
         let timeline = Timeline::build(&plan, &metrics)?;
         warnings.extend(timeline.warnings.iter().cloned());
         tracing::info!(
@@ -213,12 +274,14 @@ impl Renderer {
             fps: timeline.fps,
             format: plan.target.format,
             quality: self.opts.quality,
+            low_priority: self.opts.low_priority,
         };
         let mut sink = CompositeSink::start(
             Compositor::new(pack, g.scale, plan.cursor.scale),
             sr_encoder::open_sink(output, &settings, self.opts.ffmpeg.as_deref())?,
         );
         let stats = sr_capture::capture(&mut page, &timeline, &mut sink, on_progress)?;
+        let worker = sink.times;
         if stats.max_scroll_drift_px > 1.0 {
             warnings.push(format!(
                 "the page scrolled up to {:.0}px less than planned (it got shorter while recording)",
@@ -249,6 +312,16 @@ impl Renderer {
             fps: timeline.fps,
             warnings,
             elapsed_s: started.elapsed().as_secs_f64(),
+            stages: StageTimings {
+                browser_start_s: self.browser_start.take().unwrap_or_default().as_secs_f64(),
+                page_load_s: page_load.as_secs_f64(),
+                probe_s: probe.as_secs_f64(),
+                page_step_s: stats.step_time.as_secs_f64(),
+                screenshot_s: stats.screenshot_time.as_secs_f64(),
+                worker_wait_s: stats.sink_time.as_secs_f64(),
+                compose_s: worker.compose.as_secs_f64(),
+                encode_s: worker.encode.as_secs_f64(),
+            },
         })
     }
 
@@ -317,7 +390,18 @@ fn probe_targets(
 /// (one worker, FIFO channel), so output is unchanged.
 struct CompositeSink {
     tx: Option<SyncSender<Job>>,
-    worker: Option<JoinHandle<AppResult<()>>>,
+    worker: Option<JoinHandle<AppResult<WorkerTimes>>>,
+    /// The worker's busy time, filled in when it has finished.
+    times: WorkerTimes,
+}
+
+/// Busy time of the worker thread (for [`StageTimings`]).
+#[derive(Debug, Clone, Copy, Default)]
+struct WorkerTimes {
+    /// PNG decode + cursor drawing.
+    compose: Duration,
+    /// Handing frames to the video sink + finishing the file.
+    encode: Duration,
 }
 
 enum Job {
@@ -336,8 +420,10 @@ impl CompositeSink {
     fn start(mut compositor: Compositor, mut video: Box<dyn VideoSink + Send>) -> CompositeSink {
         // A few frames of buffer: enough to smooth out timing, small in memory.
         let (tx, rx) = sync_channel::<Job>(3);
-        let worker = std::thread::spawn(move || -> AppResult<()> {
+        let worker = std::thread::spawn(move || -> AppResult<WorkerTimes> {
+            let mut times = WorkerTimes::default();
             for job in rx {
+                let started = Instant::now();
                 match job {
                     Job::Frame {
                         index,
@@ -346,29 +432,40 @@ impl CompositeSink {
                         kind,
                     } => {
                         let done = compositor.compose(&png, &cursor, kind)?;
+                        let composed = Instant::now();
+                        times.compose += composed - started;
                         video.push(index, done.width, done.height, &done.rgba)?;
+                        times.encode += composed.elapsed();
                     }
-                    Job::Finish => return video.finish(),
+                    Job::Finish => {
+                        video.finish()?;
+                        times.encode += started.elapsed();
+                        return Ok(times);
+                    }
                 }
             }
-            Ok(())
+            Ok(times)
         });
         CompositeSink {
             tx: Some(tx),
             worker: Some(worker),
+            times: WorkerTimes::default(),
         }
     }
 
-    /// Stops the worker and returns its result.
+    /// Stops the worker and returns its result (its times go to `self.times`).
     fn join(&mut self) -> AppResult<()> {
         self.tx = None;
         match self.worker.take() {
-            Some(handle) => handle.join().unwrap_or_else(|_| {
-                Err(AppError::new(
-                    ErrorCode::Internal,
-                    "the frame compositing thread crashed",
-                ))
-            }),
+            Some(handle) => {
+                self.times = handle.join().unwrap_or_else(|_| {
+                    Err(AppError::new(
+                        ErrorCode::Internal,
+                        "the frame compositing thread crashed",
+                    ))
+                })?;
+                Ok(())
+            }
             None => Ok(()),
         }
     }

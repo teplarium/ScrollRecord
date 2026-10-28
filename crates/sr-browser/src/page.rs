@@ -61,6 +61,11 @@ impl Browser {
             .to_owned())
     }
 
+    /// Process id of the browser's main process (tests check its priority).
+    pub fn pid(&self) -> u32 {
+        self.process.pid()
+    }
+
     /// Opens a new blank tab.
     pub fn new_page(&mut self) -> AppResult<Page<'_>> {
         let target = self.cdp.call(

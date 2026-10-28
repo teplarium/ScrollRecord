@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Before the editor — render speed report and lower priority
+- After each video, `scrollrecord render` now shows where the time went: browser start, page loading, finding the buttons, moving the page frame by frame, screenshots, drawing the cursor and encoding. `--json` includes the same numbers (`stages`). This tells us what to speed up next.
+- While rendering, Chrome and ffmpeg now run at "below normal" priority, so the computer stays responsive (music, browser, typing). The video is exactly the same; it only takes longer when other programs are busy (on an idle computer the speed is unchanged). `--normal-priority` turns this off. On Windows, Chrome keeps the page itself and its graphics part at normal priority; the heaviest parts (video encoding, screenshots) run lower.
+
 ### Phase 1b — tested on "heavy" sites
 - Five new test sites: CSS animations, GSAP + ScrollTrigger, Lenis smooth scroll, a React app, and a page with video, Lottie, canvas/WebGL and an animated GIF. Each one now renders smoothly and gives exactly the same frames twice. Example scenarios for them are in `examples/` (02–06).
 

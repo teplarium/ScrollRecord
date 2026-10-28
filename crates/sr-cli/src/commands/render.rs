@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use clap::Args;
 use sr_core::{AppError, AppResult, ErrorCode};
 use sr_encoder::Quality;
-use sr_render::{RenderOptions, RenderReport, Renderer};
+use sr_render::{RenderOptions, RenderReport, Renderer, StageTimings};
 
 use super::{load_flow, print_warnings};
 
@@ -39,6 +39,10 @@ pub struct RenderArgs {
     /// Show the browser window while rendering (debugging).
     #[arg(long)]
     pub headful: bool,
+    /// Run the browser and ffmpeg at normal priority. By default they run
+    /// below normal, so the computer stays responsive; the video is the same.
+    #[arg(long)]
+    pub normal_priority: bool,
     /// Print a JSON report at the end.
     #[arg(long)]
     pub json: bool,
@@ -68,6 +72,7 @@ pub fn run(args: RenderArgs) -> AppResult<()> {
         } else {
             Quality::Fast
         },
+        low_priority: !args.normal_priority,
         ..RenderOptions::default()
     };
     opts.launch.headless = !args.headful;
@@ -94,6 +99,7 @@ pub fn run(args: RenderArgs) -> AppResult<()> {
                     report.frames,
                     report.elapsed_s,
                 );
+                print_stages(&report.stages);
                 reports.push(report);
             }
             Err(err) => {
@@ -115,6 +121,29 @@ pub fn run(args: RenderArgs) -> AppResult<()> {
         println!("{json}");
     }
     failure.map_or(Ok(()), Err)
+}
+
+// ── Stage timings ───────────────────────────────────────────────────────────
+// Two lines, because the worker runs alongside the browser: the first line
+// happens one stage after another, the second at the same time as it. Seeing
+// that split is what tells whether faster encoding would help (HANDOFF §14.1).
+fn print_stages(s: &StageTimings) {
+    let mut first = Vec::new();
+    if s.browser_start_s > 0.0 {
+        first.push(format!("browser start {:.1} s", s.browser_start_s));
+    }
+    first.extend([
+        format!("page load {:.1} s", s.page_load_s),
+        format!("probe {:.1} s", s.probe_s),
+        format!("page steps {:.1} s", s.page_step_s),
+        format!("screenshots {:.1} s", s.screenshot_s),
+        format!("waiting for the worker {:.1} s", s.worker_wait_s),
+    ]);
+    eprintln!("    stages: {}", first.join(" · "));
+    eprintln!(
+        "    alongside, in a worker: decode + cursor {:.1} s · encoding {:.1} s",
+        s.compose_s, s.encode_s
+    );
 }
 
 // ── Progress line ───────────────────────────────────────────────────────────

@@ -103,6 +103,28 @@ fn render_once(flow: &Flow, out: &Path) -> Vec<Vec<u8>> {
     assert!(report.warnings.is_empty(), "{:?}", report.warnings);
     assert!(report.timeline_file.is_file(), "timeline.json written");
 
+    // ── Stage timings: every stage measured, nothing counted twice ──
+    // (The scenario hovers a button, so the probe stage really runs.)
+    let s = &report.stages;
+    for (stage, secs) in [
+        ("browser start", s.browser_start_s),
+        ("page load", s.page_load_s),
+        ("probe", s.probe_s),
+        ("page step", s.page_step_s),
+        ("screenshot", s.screenshot_s),
+        ("compose", s.compose_s),
+        ("encode", s.encode_s),
+    ] {
+        assert!(secs > 0.0, "stage '{stage}' was not measured: {s:?}");
+    }
+    let render_thread =
+        s.page_load_s + s.probe_s + s.page_step_s + s.screenshot_s + s.worker_wait_s;
+    assert!(
+        render_thread <= report.elapsed_s,
+        "render-thread stages ({render_thread:.3} s) exceed the wall clock ({:.3} s): {s:?}",
+        report.elapsed_s
+    );
+
     let mut files: Vec<_> = std::fs::read_dir(out)
         .expect("frames folder")
         .flatten()

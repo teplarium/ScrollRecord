@@ -26,6 +26,14 @@ fn start() -> Option<Browser> {
 
 /// Like `start`, with extra browser flags.
 fn start_with(extra: &[&str]) -> Option<Browser> {
+    start_custom(|opts| {
+        opts.extra_args
+            .extend(extra.iter().map(|a| (*a).to_owned()));
+    })
+}
+
+/// Like `start`, with changed launch options.
+fn start_custom(change: impl FnOnce(&mut LaunchOptions)) -> Option<Browser> {
     let Ok(path) = find_browser(None) else {
         eprintln!("skipped: no Chromium-based browser installed");
         return None;
@@ -35,9 +43,25 @@ fn start_with(extra: &[&str]) -> Option<Browser> {
         // CI containers often forbid Chrome's sandbox; the test page is local and trusted.
         opts.extra_args.push("--no-sandbox".into());
     }
-    opts.extra_args
-        .extend(extra.iter().map(|a| (*a).to_owned()));
+    change(&mut opts);
     Some(Browser::launch(&path, &opts).expect("launch"))
+}
+
+/// The OS priority of a process: the Windows priority class
+/// ("Normal", "BelowNormal") or the Unix niceness ("0", "10").
+fn priority(pid: u32) -> String {
+    let out = if cfg!(windows) {
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command"])
+            .arg(format!("(Get-Process -Id {pid}).PriorityClass"))
+            .output()
+    } else {
+        std::process::Command::new("ps")
+            .args(["-o", "ni=", "-p", &pid.to_string()])
+            .output()
+    }
+    .expect("ask the OS for the priority");
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
 /// Scroll + time only, no pointer.
@@ -347,4 +371,27 @@ fn software_frames_do_not_depend_on_leftover_tile_memory() {
 
     page.close().expect("close tab");
     browser.close();
+}
+
+/// A render must not make the computer sluggish: by default the browser
+/// runs below normal priority (HANDOFF §14.1); turned off, it gets the same
+/// priority as the program that started it.
+#[test]
+fn browser_runs_below_normal_priority_unless_turned_off() {
+    let own = priority(std::process::id());
+    let Some(low) = start() else {
+        return;
+    };
+    let expected = if cfg!(windows) {
+        "BelowNormal".to_owned()
+    } else {
+        let own: i32 = own.parse().expect("niceness");
+        (own + 10).min(19).to_string()
+    };
+    assert_eq!(priority(low.pid()), expected, "default: low priority");
+    low.close();
+
+    let normal = start_custom(|o| o.low_priority = false).expect("browser");
+    assert_eq!(priority(normal.pid()), own, "turned off: unchanged");
+    normal.close();
 }
