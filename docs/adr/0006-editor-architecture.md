@@ -1,6 +1,6 @@
 # 0006 — Editor architecture (Phase 3)
 
-- **Status:** accepted (owner's answers to the product questions: 2026-10-28, see the end)
+- **Status:** accepted (owner's answers to the product questions: 2026-10-28, see the end); **editor layout changed 2026-10-29 (D-38) — read "Update 2026-10-29" at the end before §1, §5 and §6**
 - **Date:** 2026-10-28
 - **Related:** HANDOFF §7.4 (D-05 hybrid canvas), §7.5, §7.6, D-03 (React Flow), D-18 (types from Rust); FR-PRJ-01…05, FR-SRC-01/02, FR-CNV-01…12, FR-RND-02…04, FR-PRV-01, NFR-02, NFR-05; ADR 0002 (capture), ADR 0005 (priority)
 
@@ -46,14 +46,14 @@ Constraints: no business logic in Tauri handlers (AGENTS §3); `unsafe_code = "f
 - The job registry (threads, ids, cancel flags) is shell glue in `src-tauri/src/jobs.rs`; the work itself is library code (`sr-render`, `sr-analyzer`). `sr-render` gets a cancel flag (checked once per frame) and keeps its CLI behaviour (NFR-09).
 - **Binary data never goes through JSON IPC** (no base64 images): tiles are files; preview frames go over a channel as raw bytes or through the same protocol as tiles (decided in step 3.8).
 
-### 5. Page boards and block cards — new crate `sr-analyzer`
+### 5. Page boards and block cards — new crate `sr-analyzer` (superseded in part by the 2026-10-29 update: no page boards)
 - Opens the page exactly like the renderer (same `sr-site` server, `sr-browser` launch, device emulation, `prepare`), so the canvas shows what the video will show (D-05). Produces: a full-page screenshot cut into **tiles** (e.g. 512 px, levels of detail 1, ½, ¼ …) and **element boxes** with locator candidates (for the inspector, FR-CNV-03).
 - Tiles are display-only, so they may be lossy (JPEG/WebP) — the video is always captured fresh.
 - **Cache rule (owner, HANDOFF §14.1):** on disk in the project's `cache/<page>/<device>/<fingerprint>/` (fingerprint = site files' sizes and dates for a folder; manual "refresh" for a URL); the last 2 fingerprints per page and device are kept, older ones deleted. In RAM: the UI keeps only the tiles in view plus a small recently-used set under a **hard limit** (~200 MB of decoded images); the OS file cache keeps hot files fast. No RAM disk.
 - Tiles reach the webview through a **custom URI protocol** registered by the shell (`sr-tile://…`) that serves only files under the open project's `cache/` — tighter than opening Tauri's general asset protocol to arbitrary folders.
 - Linux (WebKitGTK) performance with big images: tiles keep each image small; checked on CI and in the Podman container.
 
-### 6. UI layout
+### 6. UI layout (superseded by the 2026-10-29 update)
 - `app/App.tsx` switches between the start screen and the editor (two screens: no router library).
 - Feature folders as in HANDOFF §7.5: `features/projects`, `features/editor` (screen layout, top bar, device switcher), `features/canvas` (React Flow node types: Start/End oval, Block card, Navigate shape, page board), `features/inspector` (properties panel), `features/render-queue`, `features/preview`; `shared/store` (document + view stores, history).
 - The canvas shows one device at a time; positions are shared by all devices; switching the device re-measures cards and boards (FR-CNV-11).
@@ -77,3 +77,18 @@ Constraints: no business logic in Tauri handlers (AGENTS §3); `unsafe_code = "f
 3. **New project:** name + site (folder or address), then an empty scenario (Start → End) or an imported scenario file. An empty name becomes **"Untitled N"** (translated via i18n; Russian later "Без названия N"), N = the smallest number with no folder of that name in the chosen location — no upper limit.
 4. **Canvas colours:** follow the system light/dark theme (the app's existing light/dark tokens).
 5. **Disk cache:** keep the last 2 versions of each page snapshot plus a "Clear cache" button (accepted as proposed).
+
+## Update 2026-10-29 — editor layout (owner, HANDOFF D-38)
+The owner described the editor (sketch over a Figma screenshot). It replaces the page boards and the inspector mode on the canvas.
+
+**Window, top to bottom / left to right**
+- **Tab bar** at the very top: one tab per open project, like file tabs in Figma; a "+" tab opens the start screen (new / open / recent). Several projects are open at once (FR-CNV-16).
+- **Left: "Site map" panel.** Start and End at the top (dragged onto the canvas). Below, a tree: page → its blocks → the interactive elements of each block (anything the cursor can act on: buttons, links, checkboxes, inputs, selects, date pickers, draggable elements; plain text as a target later — keep the element kinds an open list). A "show block previews" switch: off = rows "icon + name" like Figma layers; on = pictures — a collapsed page shows its first screen, an expanded page shows its blocks in order with gaps between them, an expanded block shows its elements one by one.
+- **Centre: canvas** (FigJam style) with the scenario only: Start/End ovals, block cards, Navigate shape, arrows. A node arrives by dragging it from the site map, or by clicking it there (placed in the centre of the visible canvas). Arrows are pulled out of a node's edge/handle. No bottom toolbar.
+- **Right: properties panel** of the selected node or arrow; at its top a compact row: device switcher, preview, render, render queue. No profile/accounts.
+
+**What changes in the decisions above**
+- §1: `layout.json` holds node positions and the canvas viewport only (no board positions). Rust keeps **no "current project"**: several projects are open at once, so every project command takes the project folder; one lock file per project.
+- §5: `sr-analyzer` produces the **site map** instead of tiled full-page boards: per page and device the blocks (FR-BLK-06 auto-detection — `data-sr` first, then `header`/`section`/`footer`, large children of `main`/`body`, `id` anchors — moves from MVP+ into Phase 3) and each block's interactive elements, with boxes and locator candidates; pictures = the page's first screen, one image per block, one per element (lossy, sized for the panel and the cards). No levels-of-detail tiles. The custom protocol (name decided in that step) serves only the `cache/` folders of the open projects. Cache rule, RAM hard limit and "load only visible pictures" stay.
+- §6: `App.tsx` holds the tab list instead of switching two screens; each tab owns its project's document store, view store and history. Feature folders: `features/projects` (start screen, tabs), `features/editor` (window layout, the right panel's top row), `features/site-map` (left panel), `features/canvas` (Start/End, block card, Navigate, arrows), `features/inspector` (properties panel), `features/render-queue`, `features/preview`. Switching the device re-measures the site map and the cards (FR-CNV-11).
+- Inspector mode (FR-CNV-03) is dropped: blocks and elements are chosen in the site map.

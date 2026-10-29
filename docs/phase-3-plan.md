@@ -3,16 +3,17 @@
 Working document shared by Claude Code sessions (see CLAUDE.md). Keep it short: tick items, keep "Next session starts here" current, move details into code, ADRs and PROJECT_MAP.
 
 **Goal (HANDOFF §14):** the Phase 1 scenario (`examples/01-plain-landing.srflow.json`) is built with the mouse in a couple of minutes.
-**Architecture:** ADR 0006 (read it before any Phase 3 step).
-**Requirements:** HANDOFF §5.1 (FR-PRJ), §5.2 (FR-SRC-01/02, FR-VP), §5.3 (FR-CNV), §5.4 (FR-BLK, FR-NAV shapes only), §5.5 (FR-ANC), §5.9 (FR-RND, FR-PRV), §5.11 (FR-I18N), §6 (NFR-02, NFR-05), §7.4 (why cards are snapshots).
-**Already decided:** D-01 Tauri v2 · D-02 React + TS + Vite · D-03 React Flow (`@xyflow/react`, MIT; not tldraw) · D-05 snapshot cards + one live block · D-10/D-17/D-18 types from Rust via ts-rs, contract in `sr-ipc` · D-12 i18next · state: Zustand + undo/redo (HANDOFF §7.6).
+**Architecture:** ADR 0006 (read it before any Phase 3 step), including its "Update 2026-10-29" (editor layout, D-38).
+**Requirements:** HANDOFF §5.1 (FR-PRJ), §5.2 (FR-SRC-01/02, FR-VP), §5.3 (FR-CNV, incl. -16 tabs), §5.4 (FR-BLK incl. -06 auto-detection, FR-NAV shapes only), §5.5 (FR-ANC), §5.9 (FR-RND, FR-PRV), §5.11 (FR-I18N), §6 (NFR-02, NFR-05), §7.4 (why cards are snapshots).
+**Already decided:** D-01 Tauri v2 · D-02 React + TS + Vite · D-03 React Flow (`@xyflow/react`, MIT; not tldraw) · D-05 snapshot cards + one live block · D-10/D-17/D-18 types from Rust via ts-rs, contract in `sr-ipc` · D-12 i18next · state: Zustand + undo/redo (HANDOFF §7.6) · D-36/D-37 project folder, autosave · **D-38 layout: project tabs on top · left "Site map" (Start/End + page → blocks → interactive elements, preview switch) · centre canvas with the scenario only (no page board, no bottom toolbar; nodes dragged/clicked in from the site map, arrows pulled from node edges) · right properties panel with device / preview / render / queue on top.**
 **Starting point:** the desktop app shows a start screen; `create_project` / `open_project` answer SR-0002 "planned". `sr-render::Renderer` renders from the CLI with a progress callback, but has no cancel and no events for a UI.
 
 ## Next session starts here
 Steps 1b-fix and **1c are done** (1c on 2026-10-28: stage timings in the render report, ffmpeg and — on Windows — Chrome below normal priority; numbers and the GPU-encoding verdict in HANDOFF §14.1 — postponed, it would not speed renders up). CI run #11 failed on Linux because Chrome was started through `nice`; fixed the same day (step 1c, "CI fix", ADR 0005). Waiting for the owner's push and a green CI run on both OSes. Linux can be reproduced locally: Podman container `ubuntu:24.04` + Google Chrome (see the Claude Code memory note). If a later CI run shows "renders differ", its message says where the frames differ (`heavy_sites.rs` → `Pixels::difference`).
 The repository lives at `E:\Проекты\ScrollRecord` (NVMe, Cyrillic kept for NFR-02).
 **Step 3.0 is done** (2026-10-28): ADR 0006 "Editor architecture" is accepted, with the owner's answers at its end, and the steps below are re-split.
-Next work: **step 3.1a** (crate `sr-project`, scenario types to TypeScript, project commands) in a new session. Carry into 3.7: render targets in parallel (1c showed the CPU mostly idle). The other ideas the owner accepted for later (GPU video encoding, audio) are in HANDOFF §14.1.
+**2026-10-29:** the owner described the editor layout (sketch over a Figma screenshot) → **D-38** in HANDOFF, "Update 2026-10-29" in ADR 0006, steps 3.1–3.9 below re-split (page boards and inspector mode dropped; site map in the left panel; block auto-detection moved into Phase 3; project tabs). The owner is still answering the other questions of that session: is a project one site + one scenario or several videos; are devices/formats chosen when creating a project; does a new project start empty (Start → End); what a block card shows; one device at a time or side by side; what else in HANDOFF is wrong. Write the answers into HANDOFF/ADR/this plan **before** starting 3.1a (answer 1 may change the project folder format).
+Next work: **step 3.1a** (crate `sr-project`, scenario types to TypeScript, project commands) once those answers are recorded. Carry into 3.7: render targets in parallel (1c showed the CPU mostly idle). The other ideas the owner accepted for later (GPU video encoding, audio) are in HANDOFF §14.1.
 This PC has Rust 1.97 (`%USERPROFILE%\.cargo\bin`, prefix PATH in PowerShell), VS 2022 Build Tools and pnpm (via corepack). Google Chrome 155 is installed and is the browser the tests use.
 
 ## Steps
@@ -46,56 +47,63 @@ HANDOFF §14.1 ("step 0" of GPU encoding, and lower render priority). CLI/core o
 - [x] Steps re-split (owner agreed 2026-10-28): projects first, then the canvas in two parts — "see" before "edit" — so the owner can judge the canvas early.
 - [x] (owner) Answered the 5 questions (2026-10-28, end of ADR 0006): user picks the folder (first suggestion `Documents\ScrollRecord\`, then the last one used); autosave, no Save button; empty name → "Untitled N"; canvas follows the system theme; cache keeps 2 snapshot versions + "Clear cache". New idea for later: "Export project" for another computer (HANDOFF §14.1).
 
-### 3.1 Projects — FR-PRJ-01…04, FR-SRC-01/02 — 2 sessions
+Re-split 2026-10-29 for D-38 (editor layout). The old "3.5 Page boards" and "3.6 Inspector mode" are gone: the site map in the left panel replaces both.
+
+### 3.1 Projects and tabs — FR-PRJ-01…04, FR-SRC-01/02, FR-CNV-16 — 2 sessions
 **3.1a Rust side (1 session)**
-- [ ] New crate `sr-project` (ADR 0006 §1): `project.json`, `flow.srflow.json`, `layout.json`, `cache/`, `renders/`; create / open / save with atomic writes (`.tmp` → rename, `.bak` kept); lock file; recent list + last location used, in the app config folder. Default name "Untitled N" (smallest free N in the chosen folder); first suggested location `Documents\ScrollRecord\`. Keep paths portable (relative `meta.site` when possible) for the later "Export project". Tests incl. a Cyrillic path (NFR-02), a project next to its site folder, and "Untitled 1/2/3" numbering with gaps.
+- [ ] New crate `sr-project` (ADR 0006 §1): `project.json`, `flow.srflow.json`, `layout.json`, `cache/`, `renders/`; create / open / save with atomic writes (`.tmp` → rename, `.bak` kept); lock file per project; recent list + last location used, in the app config folder. Default name "Untitled N" (smallest free N in the chosen folder); first suggested location `Documents\ScrollRecord\`. Keep paths portable (relative `meta.site` when possible) for the later "Export project". Tests incl. a Cyrillic path (NFR-02), a project next to its site folder, and "Untitled 1/2/3" numbering with gaps.
+- [ ] Several projects open at once (tabs, D-38): Rust keeps no "current project"; every project command takes the project folder. Opening a project that is already open in this window is the UI's job (switch to its tab), not a lock-file error.
 - [ ] `sr-core::flow` types → TypeScript (ts-rs, `#[ts(type = …)]` for custom serde forms); a test that a parsed example round-trips through JSON unchanged.
 - [ ] Import a `*.srflow.json` (its `layout` → `layout.json`) and export one (layout embedded).
 - [ ] Async Tauri commands `create_project`, `open_project`, `save_project`, `recent_projects`, `import_flow`, `export_flow` + wrappers in `commands.ts`; new error codes (not a project / newer format / locked / site folder missing) with ERRORS.md + `en/common.json`.
-**3.1b Start screen (1 session)**
+**3.1b Tabs and start screen (1 session)**
+- [ ] Tab bar at the very top (D-38): one tab per open project + "+"; switch, close. "+" (and an app with no open project) shows the start screen inside a tab.
 - [ ] `tauri-plugin-dialog` for folder/file pickers. Start screen: new project form (name — empty means "Untitled N"; location with "Choose…", first `Documents\ScrollRecord\` then the last one used; site folder or URL; empty scenario or import), open, recent list (missing folders shown and removable).
-- [ ] App switches to an editor placeholder showing the project name and site; autosave wiring comes with the store in 3.3.
-- [ ] (owner) Create a project for `tests/fixtures/sites/01-plain-landing`, close the app, reopen it from the recent list.
+- [ ] A project tab shows an editor placeholder with the project name and site; autosave wiring comes with the store in 3.4.
+- [ ] (owner) Create a project for `tests/fixtures/sites/01-plain-landing`, open a second one, switch tabs, close the app, reopen both from the recent list.
 
-### 3.2 Canvas, part 1 — see the scenario — FR-CNV-01, -07, -08 (display), -12 — 1 session
-- [ ] Editor screen layout: top bar (project name, device switcher, Render button placeholder) · canvas · properties panel (empty for now).
-- [ ] React Flow (`@xyflow/react`): pan, zoom, "fit all", minimap. Node types: Start/End oval, Block card (plain), Navigate shape (drawing only; navigation itself is Phase 4). Arrows from the scenario's edges.
+### 3.2 Window layout and canvas, part 1 — see the scenario — FR-CNV-01, -07, -08 (display), -10 (frame), -12 — 1 session
+- [ ] Editor layout per D-38: tabs on top · left "Site map" panel (for now: Start and End at the top, the scenario's `pages` below, no blocks yet) · canvas · right panel (empty properties area; top row with device switcher, preview, render and queue buttons as placeholders). No bottom toolbar.
+- [ ] React Flow (`@xyflow/react`): pan, zoom, "fit all", minimap. Node types: Start/End oval, Block card (name + hold time, picture area empty until 3.6), Navigate shape (drawing only; navigation itself is Phase 4). Arrows from the scenario's edges.
 - [ ] Own auto-layout for scenarios without layout (column in path order, branches offset) (FR-CNV-12). Stays smooth with 200+ nodes (NFR-05): a generated 250-node test scenario.
-- [ ] (owner) Open the example 01 project: the scenario appears as a chain Start → hero → … → End; zoom, pan, minimap work.
+- [ ] (owner) Open the example 01 project: three panels as in the sketch; the scenario appears as a chain Start → hero → … → End; zoom, pan, minimap work.
 
-### 3.3 Canvas, part 2 — edit — FR-CNV-07, -08, -09, FR-PRJ-02, -05 — 1–2 sessions
-- [ ] `shared/store`: document store `{flow, layout}` + view store (selection, zoom, device) + own undo history (ADR 0006 §3) with unit tests (drag = one step, typing coalesced, 200-step cap).
-- [ ] Create nodes from the toolbar and shortcuts, connect / delete arrows and nodes, move nodes (positions → `layout.json`); Ctrl+Z / Ctrl+Shift+Z.
-- [ ] Autosave (per owner answer 2) + save on close; lock-file warning.
+### 3.3 Site map, part 1 — structure — FR-CNV-02 (list mode), FR-BLK-06 — 2 sessions
+- [ ] New crate `sr-analyzer` (ADR 0006 §5 + update): open each page exactly like the renderer (same `sr-site`, `sr-browser`, emulation, `prepare`); find the **blocks** (`data-sr` first, then `header`/`section`/`footer`, large children of `main`/`body`, `id` anchors) and, inside each block, its **interactive elements** (buttons, links, inputs, checkboxes, selects, date pickers, draggable elements; element kinds an open list so plain text can be added later), with boxes and locator candidates (`data-sr` first, then id / role+name / CSS / text). Tests on the fixture sites (01 plain landing at least; 05 React SPA).
+- [ ] First long job: `src-tauri/src/jobs.rs` (job id, `Channel` progress, cancel flag) + "Cancelled" error code. Results cached in the project's `cache/<page>/<device>/<fingerprint>/`, last 2 fingerprints kept, "Clear cache".
+- [ ] Left panel tree in list mode (preview switch off): page → blocks → elements as "icon + name" rows, expand/collapse like Figma layers; Start/End stay at the top.
+- [ ] (owner) Open the example 01 project: the site map lists the page, its blocks and the buttons inside them.
+
+### 3.4 Canvas, part 2 — edit — FR-CNV-07, -08, -09, FR-PRJ-02, -05 — 1–2 sessions
+- [ ] `shared/store`: per tab a document store `{flow, layout}` + view store (selection, zoom, device) + own undo history (ADR 0006 §3) with unit tests (drag = one step, typing coalesced, 200-step cap).
+- [ ] Nodes come from the site map: drag a block (or Start/End) onto the canvas, or click it in the panel → it appears in the centre of the visible canvas. Arrows pulled out of a node's edge/handle onto another node. Delete arrows and nodes, move nodes (positions → `layout.json`); Ctrl+Z / Ctrl+Shift+Z.
+- [ ] Autosave (per owner answer 2) + save on close / tab close; lock-file warning.
 - [ ] `sr-core` issues get node/edge ids; command `validate_flow`; problem nodes highlighted with the message on hover (FR-CNV-09).
-- [ ] (owner) Add a block, connect it, undo/redo, close and reopen: the change is there.
+- [ ] (owner) Drag "hero" onto the canvas, connect Start → hero → End by pulling arrows, undo/redo, close and reopen: the change is there.
 
-### 3.4 Properties panel and targets — FR-CNV-10, FR-BLK-01/02/04/05, FR-ANC, FR-VP — 1–2 sessions
-- [ ] Block: target locators, align + offset, `hold_ms`; actions list (hover / click / move / wait: delay, duration, mode, only/except).
+### 3.5 Properties panel and targets — FR-CNV-10, FR-BLK-01/02/04/05, FR-ANC, FR-VP — 1–2 sessions
+- [ ] Block: target locators, align + offset, `hold_ms`; actions list (hover / click / move / wait: delay, duration, mode, only/except). An action's element is picked from that block's elements in the site map.
 - [ ] Start/End: block + anchor + offset, `warmup_ms`. Arrow: scroll speed or duration, easing, cursor still/follow/hide.
-- [ ] Scenario defaults (cursor pack, seed, scroll) and targets (device presets, aspect, resolution, fps, format); per-device overrides.
+- [ ] Scenario defaults (cursor pack, seed, scroll) and targets (device presets, aspect, resolution, fps, format); per-device overrides. Device switcher in the right panel's top row.
 
-### 3.5 Page boards and block cards — FR-CNV-02, -04, -11 — 2 sessions
-- [ ] `sr-analyzer` (ADR 0006 §5): open the page exactly like the renderer (same Chromium, emulation, prepare), full-page screenshot cut into tiles with levels of detail, DOM boxes of elements; cached in the project's `cache/<page>/<device>/<fingerprint>/`, last 2 fingerprints kept.
-- [ ] First long job: `src-tauri/src/jobs.rs` (job id, `Channel` progress, cancel flag) + "Cancelled" error code.
-- [ ] `sr-tile://` protocol serving only the open project's `cache/`. Page board on the canvas (tiles load only where visible, RAM hard limit); block cards show the crop of their section; switching the device re-measures.
-- [ ] Watch WebKitGTK performance with big images (HANDOFF risk 4): CI, and the Podman Linux container (memory note).
-
-### 3.6 Inspector mode — FR-CNV-03 — 1 session
-- [ ] Hover on a board highlights elements (boxes from 3.5, no live DOM); click creates a block with generated locators (`data-sr` first, then id / CSS / text).
+### 3.6 Site map, part 2 — pictures — FR-CNV-02 (preview mode), -04, -11 — 1–2 sessions
+- [ ] `sr-analyzer` pictures: the page's first screen, one image per block, one per interactive element (lossy, sized for the panel and the cards), into the same cache.
+- [ ] Custom protocol (ADR 0006 §5 + update) serving only the `cache/` folders of the open projects. Only visible pictures are loaded, RAM hard limit.
+- [ ] "Show block previews" switch: collapsed page = first screen; expanded page = its blocks in order with gaps; expanded block = its elements one by one. Block cards on the canvas show their block's picture. Switching the device re-measures the site map and the cards.
+- [ ] Watch WebKitGTK performance with many images (HANDOFF risk 4): CI, and the Podman Linux container (memory note).
 
 ### 3.7 Render queue and dry run — FR-RND-02/03/04 — 1–2 sessions
 (From 1c: try rendering 2–3 targets at the same time; one render keeps only ≈ 1.3 of 12 cores busy. Show `RenderReport.stages` in the queue.)
-- [ ] All targets with one button; progress over the job `Channel` (ADR 0006 §4); cancel; one failing target does not stop the others; file name template `{project}_{target}_{date}`; open the output folder (`tauri-plugin-opener`).
+- [ ] All targets with one button (render and queue buttons in the right panel's top row); progress over the job `Channel` (ADR 0006 §4); cancel; one failing target does not stop the others; file name template `{project}_{target}_{date}`; open the output folder (`tauri-plugin-opener`).
 - [ ] Dry run: check every locator on every device without recording.
 - [ ] `sr-render` gets a cancel flag checked once per frame; the CLI keeps working the same (NFR-09).
 
 ### 3.8 Preview — FR-PRV-01 — 1 session
-- [ ] Low-quality real-time frame stream of the scenario in the app (CDP screencast, ADR 0002 option 1).
+- [ ] Low-quality real-time frame stream of the scenario in the app (CDP screencast, ADR 0002 option 1), opened from the preview button in the right panel's top row.
 
 ### 3.9 Acceptance — 1 session
 - [ ] (owner) Build the example 01 scenario with the mouse in a couple of minutes and render it.
 - [ ] HANDOFF: Phase 3 ✅ in §14, new decisions; PROJECT_MAP; CHANGELOG; ADRs up to date.
 
 ## Not in Phase 3
-Live block FR-CNV-05 (MVP+), mini timeline, multi-select and snapping (MVP+), executing `navigate` and auto-detecting blocks (Phase 4), AI skills and Cursor Studio (Phase 5).
+Live block FR-CNV-05 (MVP+), mini timeline, multi-select and snapping (MVP+), executing `navigate` (Phase 4; block auto-detection moved into 3.3 by D-38), plain text as an action target (later; keep it easy to add), page boards and inspector mode (dropped by D-38), AI skills and Cursor Studio (Phase 5).
