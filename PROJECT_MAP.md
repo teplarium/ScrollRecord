@@ -59,7 +59,8 @@ The UI talks to Rust only through **IPC commands** whose types are **generated**
 | Crate | Status | Purpose | Key files |
 |---|---|---|---|
 | `sr-core` | ✅ | Scenario format v1, easing, `SR-xxxx` error catalog, validation, per-target plan. **No IO** | `flow/mod.rs` (types, parsing), `flow/path.rs` (validation + `plan()`), `flow/target.rs` (devices, aspect, resolution → pixel geometry), `flow/locator.rs`, `flow/action.rs` (hover/click/move/wait), `flow/cursor.rs` (cursor settings, scroll behaviour), `easing.rs`, `error.rs` |
-| `sr-ipc` | ✅ | IPC contract DTOs, exported to TypeScript | `app_info.rs` |
+| `sr-project` | ✅ | Project folder: create / open / save / close, atomic writes with `.bak`, lock file, recent projects + open tabs (`projects.json`), portable site paths, scenario import/export. No Tauri | `project.rs` (`ProjectStore`, IPC types), `manifest.rs` (`project.json`), `fsio.rs` (atomic write, path clean-up), `lock.rs`, `config.rs`, `site.rs`; tests: `tests/project.rs` |
+| `sr-ipc` | ✅ | IPC contract DTOs, exported to TypeScript; re-exports `Flow` (sr-core) and the project types (sr-project) | `app_info.rs`, `lib.rs` |
 | `sr-diagnostics` | ✅ | Logging setup (later: problem-report zip) | `lib.rs` |
 | `sr-site` | ✅ | Site source: folder → built-in HTTP server on 127.0.0.1 (std only: thread per connection, byte ranges, clean URLs, single-page-app fallback), or URL | `lib.rs` (`SiteSource`, `serve`), `server.rs` |
 | `sr-browser` | ✅ | Find & launch Chrome/Edge/Chromium; minimal DevTools-protocol client; device emulation (incl. fixed media preferences); mouse/touch input; page runtime | `locate.rs`, `process.rs`, `cdp.rs`, `page.rs` (incl. `probe`, pointer input), **`js/runtime.js`** (virtual time, animations, scroll events, framework tasks, video/audio, animated images, prepare, measure, locators, cursor kind, settle) |
@@ -70,7 +71,7 @@ The UI talks to Rust only through **IPC commands** whose types are **generated**
 | `sr-encoder` | ✅ | `VideoSink`s for raw RGBA frames: ffmpeg pipe (MP4 H.264, WebM VP9) and PNG folder | `lib.rs` |
 | `sr-render` | ✅ | Orchestrator used by CLI (and later the app): `Renderer::start/render/finish`, probe + reload, compositing worker thread, output naming, `timeline.json` | `lib.rs`; tests: `tests/render_fixture.rs` (fixture 01), `tests/heavy_sites.rs` (fixtures 02–06) |
 | `sr-cli` | ✅ | `scrollrecord` command: `render`, `validate`, `info`, `errors` | `main.rs`, `commands/*.rs` |
-| `sr-analyzer` | ⏳ Phase 3 | DOM boxes for the editor, block auto-detection, tiles, site digest | — |
+| `sr-analyzer` | ⏳ Phase 3 | Site map for the editor: blocks (`data-sr` + scenario blocks), their interactive elements, boxes, locators, pictures (ADR 0006 update, D-38/D-39); later block auto-detection (Phase 4), site digest (Phase 5) | — |
 | `sr-skill` | ⏳ Phase 5 | AI skill packages | — |
 
 Crates are created only when their phase starts (HANDOFF D-18).
@@ -81,7 +82,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|
 | `src/main.rs` | Binary entry; hides the console window on Windows release builds |
 | `src/lib.rs` | `run()`: logging start, state, **list of registered IPC commands** |
-| `src/state.rs` | `AppState`: process-wide state (log guard) |
+| `src/state.rs` | `AppState`: process-wide state (log guard, `ProjectStore`, projects open in this window — locks released on exit) |
 | `src/commands/` | One file per feature area; thin handlers returning `Result<T, AppError>` |
 | `tauri.conf.json` | Window, bundle targets (NSIS, deb, AppImage), identifier `io.github.teplarium.scrollrecord` |
 | `capabilities/default.json` | Permissions of the main window (only `core:default`) |
@@ -117,7 +118,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `docs/phase-3-plan.md` | Phase 3 steps, progress and "Next session starts here" (memory between AI sessions) |
 | `CONTRIBUTING.md` | Dev setup, workflow, recipes |
 | `docs/ERRORS.md` | Error catalog: one `## SR-xxxx` section per code |
-| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server), `0005` render priority (browser lowered on Windows only), `0006` editor architecture (Phase 3: project folder, state, IPC jobs, tiles) |
+| `docs/adr/` | Decisions: `0001` stack, `0002` deterministic capture, `0003` cursor & composition, `0004` heavy sites (animations, scroll events, media, site server), `0005` render priority (browser lowered on Windows only), `0006` editor architecture (Phase 3: project folder, state, IPC jobs, site-map pictures; layout update 2026-10-29) |
 | `.github/` | CI (Rust + UI on Windows & Linux; artifacts: CLI package + installers), issue forms |
 | `.cargo/config.toml` | Where ts-rs writes TypeScript bindings |
 | `rust-toolchain.toml` | Pinned Rust version (1.97.0) |
@@ -145,6 +146,9 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `FrameSink`, `CapturedFrame`, `capture()`, `Progress` | `sr-capture/src/lib.rs` | Frame loop |
 | `VideoSink`, `FfmpegEncoder`, `PngSequence`, `EncodeSettings`, `Quality` | `sr-encoder/src/lib.rs` | Output |
 | `Renderer`, `RenderOptions`, `RenderReport`, `StageTimings` | `sr-render/src/lib.rs` | Whole pipeline; per-stage busy times in the report (`CaptureStats` in `sr-capture` measures the frame loop) |
+| `ProjectStore`, `NewProject`, `OpenedProject`, `ImportedFlow`, `ProjectHome`, `RecentProject` | `sr-project/src/project.rs` | Project operations and their IPC data |
+| `ProjectManifest`, `RenderSettings` | `sr-project/src/manifest.rs` | `project.json` |
+| `ProjectsConfig`, `RecentEntry` | `sr-project/src/config.rs` | `projects.json` (recent list, last location, open tabs) |
 | `AppInfo` | `sr-ipc/src/app_info.rs` | Versions for UI/bug reports |
 | `IpcResult<T>`, `commands` | `apps/desktop/src/shared/ipc/commands.ts` | UI → Rust calls |
 
@@ -155,8 +159,14 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | Command (Rust) | Handler file | TS wrapper | Returns | Used in |
 |---|---|---|---|---|
 | `app_info` | `src-tauri/src/commands/app.rs` | `commands.appInfo()` | `AppInfo` | `useAppInfo` → `AppFooter` |
-| `create_project` | `src-tauri/src/commands/project.rs` | `commands.createProject()` | `null` (now: SR-0002) | `StartScreen` |
-| `open_project` | `src-tauri/src/commands/project.rs` | `commands.openProject()` | `null` (now: SR-0002) | `StartScreen` |
+| `project_home` | `src-tauri/src/commands/project.rs` | `commands.projectHome()` | `ProjectHome` | (3.1b start screen) |
+| `create_project` | `src-tauri/src/commands/project.rs` | `commands.createProject(request)` | `OpenedProject` | (3.1b; `StartScreen` shows SR-0002 until then) |
+| `open_project` | `src-tauri/src/commands/project.rs` | `commands.openProject(dir, force)` | `OpenedProject` | (3.1b) |
+| `save_project` | `src-tauri/src/commands/project.rs` | `commands.saveProject(dir, flow, layout)` | `null` | (3.4 autosave) |
+| `close_project` | `src-tauri/src/commands/project.rs` | `commands.closeProject(dir)` | `null` | (3.1b tabs) |
+| `forget_recent` | `src-tauri/src/commands/project.rs` | `commands.forgetRecent(dir)` | `null` | (3.1b recent list) |
+| `import_flow` | `src-tauri/src/commands/project.rs` | `commands.importFlow(dir, file)` | `ImportedFlow` | (editor) |
+| `export_flow` | `src-tauri/src/commands/project.rs` | `commands.exportFlow(dir, dest)` | `null` | (editor) |
 
 ---
 
@@ -213,6 +223,9 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | Temporary browser profile (deleted after each render) | `%TEMP%\scrollrecord-browser-<pid>-<time>-<n>\` | `/tmp/scrollrecord-browser-<pid>-<time>-<n>/` |
 | Render output (CLI default) | `renders\` next to the scenario file | same |
 | UI preferences (language) | WebView local storage | WebView local storage |
+| Recent projects, last location, open tabs (`projects.json`) | `%APPDATA%\io.github.teplarium.scrollrecord\` | `~/.config/io.github.teplarium.scrollrecord/` |
+| New projects (first suggestion) | `Documents\ScrollRecord\` | `~/Documents/ScrollRecord/` |
+| Project lock (deleted when the tab closes or the app exits) | `<project>\.scrollrecord.lock` | same |
 
 Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser), `SR_FFMPEG=<path>` (ffmpeg).
 
@@ -222,7 +235,7 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 
 1. `sr-core` depends on no other ScrollRecord crate.
 2. Library crates never depend on `sr-cli` or `sr-desktop`.
-3. Order (lower may not import higher): `core` → `ipc` / `diagnostics` / `site` / `browser` / `timeline` / `cursor` → `capture` / `compositor` → `encoder` → `render` → `cli` / `desktop`. (`encoder` needs neither `capture` nor `compositor`: it takes plain RGBA.)
+3. Order (lower may not import higher): `core` → `project` → `ipc` / `diagnostics` / `site` / `browser` / `timeline` / `cursor` → `capture` / `compositor` → `encoder` → `render` → `cli` / `desktop`. (`encoder` needs neither `capture` nor `compositor`: it takes plain RGBA.)
 4. UI features import from `shared/` and `i18n/`, never from another feature.
 5. The UI reaches Rust **only** through `shared/ipc/commands.ts`.
 
@@ -240,3 +253,5 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-25 | `CLAUDE.md` rewritten for Claude Code sessions; `docs/phase-3-plan.md` added (Phase 3 started) |
 | 2026-10-28 | Step 1c: `RenderReport.stages` (`StageTimings`), `CaptureStats` times; `low_priority` in `LaunchOptions` / `EncodeSettings` / `RenderOptions`, `Browser::pid()`; CLI `--normal-priority`; ADR 0005 |
 | 2026-10-28 | Step 3.0: ADR 0006 (editor architecture, accepted with the owner's answers); Phase 3 steps re-split in `docs/phase-3-plan.md`. No code changes |
+| 2026-10-29 | Editor layout from the owner (HANDOFF D-38, D-39): project tabs, left "Site map" panel, canvas with the scenario only, right properties panel; no page boards / inspector mode. ADR 0006 "Update 2026-10-29", Phase 3 steps re-split. No code changes |
+| 2026-10-29 | Step 3.1a: new crate `sr-project`; scenario types (`sr-core::flow`) exported to TypeScript (`Node` is `FlowNode` there); project IPC commands + `commands.ts` wrappers; `AppState` holds the `ProjectStore`; codes SR-1003…1006 |

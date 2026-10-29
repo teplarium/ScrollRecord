@@ -77,6 +77,14 @@ error_codes! {
     FileReadFailed = "SR-1001", "Could not read a file";
     /// A file or folder (e.g. the output video) could not be written.
     FileWriteFailed = "SR-1002", "Could not write a file";
+    /// The chosen folder is not a ScrollRecord project (no or broken project.json).
+    NotAProject = "SR-1003", "Folder is not a ScrollRecord project";
+    /// The project was saved by a newer ScrollRecord.
+    ProjectVersionUnsupported = "SR-1004", "Project format version is not supported";
+    /// Another ScrollRecord window has the project open (or crashed with it open).
+    ProjectLocked = "SR-1005", "Project is already open elsewhere";
+    /// A new project would overwrite an existing folder of the same name.
+    ProjectExists = "SR-1006", "A folder with this project name already exists";
 
     // ── Flow format & validation ──
     /// The scenario file is not valid JSON or does not match the format.

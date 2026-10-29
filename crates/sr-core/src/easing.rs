@@ -10,9 +10,11 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// A timing curve, written in scenario files exactly like in CSS.
-#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize, TS)]
+#[ts(export, type = "string")]
 #[serde(try_from = "String", into = "String")]
 pub enum Easing {
     /// Constant speed.

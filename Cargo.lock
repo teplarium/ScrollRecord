@@ -3264,6 +3264,7 @@ dependencies = [
  "sr-core",
  "sr-diagnostics",
  "sr-ipc",
+ "sr-project",
  "tauri",
  "tauri-build",
  "tracing",
@@ -3295,6 +3296,18 @@ dependencies = [
  "serde",
  "serde_json",
  "sr-core",
+ "sr-project",
+ "ts-rs",
+]
+
+[[package]]
+name = "sr-project"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sr-core",
+ "tracing",
  "ts-rs",
 ]
 
@@ -4163,6 +4176,7 @@ version = "12.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "756050066659291d47a554a9f558125db17428b073c5ffce1daf5dcb0f7231d8"
 dependencies = [
+ "serde_json",
  "thiserror 2.0.21",
  "ts-rs-macros",
 ]

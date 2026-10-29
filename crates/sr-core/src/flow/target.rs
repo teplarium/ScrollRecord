@@ -9,9 +9,11 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// One video to render from a scenario.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Target {
     /// Unique id, used on the command line (`--target mobile`) and in file names.
@@ -49,7 +51,8 @@ fn default_fps() -> u32 {
 }
 
 /// Output container / codec.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "kebab-case")]
 pub enum OutputFormat {
     /// H.264 in MP4 — plays everywhere.
@@ -73,7 +76,8 @@ impl OutputFormat {
 }
 
 /// How the page is placed in the video frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "kebab-case")]
 pub enum Fit {
     /// The browser viewport is resized to the output proportions; the site fills the frame.
@@ -84,7 +88,8 @@ pub enum Fit {
 }
 
 /// What the camera follows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "kebab-case")]
 pub enum Frame {
     /// The whole viewport.
@@ -97,7 +102,8 @@ pub enum Frame {
 // ── Viewports ───────────────────────────────────────────────────────────────
 
 /// A device preset name or an inline custom viewport.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(untagged)]
 pub enum ViewportRef {
     /// Name of a built-in preset, see [`Viewport::preset`].
@@ -130,7 +136,8 @@ impl ViewportRef {
 }
 
 /// A browser viewport in CSS pixels.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Viewport {
     /// Width in CSS pixels.
@@ -209,7 +216,8 @@ impl Viewport {
 // ── Aspect ratio ────────────────────────────────────────────────────────────
 
 /// Output proportions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, type = "string")]
 #[serde(try_from = "String", into = "String")]
 pub enum Aspect {
     /// Same proportions as the device screen.
@@ -268,7 +276,8 @@ impl fmt::Display for Aspect {
 // ── Resolution ──────────────────────────────────────────────────────────────
 
 /// Output size: a named class (short side in pixels) or a plain scale factor.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(untagged)]
 pub enum Resolution {
     /// `"720p"`, `"1080p"`, `"1440p"`, `"2160p"` or `"4k"`.

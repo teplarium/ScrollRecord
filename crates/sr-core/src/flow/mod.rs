@@ -21,6 +21,7 @@ mod target;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 pub use action::{Action, ActionKind, Point, PointerMode};
 pub use cursor::{CursorKind, CursorSettings, DEFAULT_CURSOR_PACK, ScrollCursor};
@@ -37,7 +38,8 @@ use crate::error::{AppError, AppResult, ErrorCode};
 pub const FORMAT_VERSION: u32 = 1;
 
 /// A complete recording scenario.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Flow {
     /// Optional JSON Schema link for editors.
@@ -70,7 +72,8 @@ pub struct Flow {
 }
 
 /// Scenario name and the site it records.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Meta {
     /// Human-readable name.
@@ -82,7 +85,8 @@ pub struct Meta {
 }
 
 /// Scroll settings of an arrow (or the defaults).
-#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct ScrollSpec {
     /// Fixed duration of the move. Wins over `speed_px_s`.
@@ -108,7 +112,8 @@ impl ScrollSpec {
 }
 
 /// Scenario-wide defaults.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Defaults {
     /// Default scroll move.
@@ -152,7 +157,8 @@ impl Default for Defaults {
 }
 
 /// When the page counts as "ready" before recording starts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum WaitCondition {
     /// Document, fonts and images loaded.
@@ -163,7 +169,8 @@ pub enum WaitCondition {
 }
 
 /// Page preparation (HANDOFF FR-VP-04).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Prepare {
     /// CSS selectors of elements to hide (cookie banners, chat widgets, dev bars).
@@ -196,7 +203,8 @@ impl Default for Prepare {
 }
 
 /// A page of the site.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Page {
     /// Unique id referenced by nodes.
@@ -208,7 +216,8 @@ pub struct Page {
 // ── Nodes ───────────────────────────────────────────────────────────────────
 
 /// A shape on the canvas.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export, rename = "FlowNode")]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Node {
     /// Oval: where recording starts.
@@ -234,7 +243,8 @@ impl Node {
 }
 
 /// Start of the recording, attached to a block (HANDOFF R-18).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct StartNode {
     /// Unique node id.
@@ -247,7 +257,8 @@ pub struct StartNode {
 }
 
 /// A page section the video scrolls to.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct BlockNode {
     /// Unique node id.
@@ -271,7 +282,8 @@ pub struct BlockNode {
 }
 
 /// Navigation to another page (Phase 4).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct NavigateNode {
     /// Unique node id.
@@ -290,7 +302,8 @@ pub struct NavigateNode {
 }
 
 /// End of the recording.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct EndNode {
     /// Unique node id.
@@ -304,7 +317,8 @@ pub struct EndNode {
 }
 
 /// Where a block lands in the frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum Align {
     /// Block top at the top of the frame (below a sticky header).
@@ -317,7 +331,8 @@ pub enum Align {
 }
 
 /// A scroll position defined relative to a block (HANDOFF FR-ANC-01).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Anchor {
     /// Block node id.
@@ -334,7 +349,8 @@ pub struct Anchor {
 }
 
 /// Named anchor points.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum AnchorPoint {
     /// Block top at the frame top.
@@ -351,7 +367,8 @@ pub enum AnchorPoint {
 }
 
 /// An arrow.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Edge {
     /// Source node id.
@@ -367,7 +384,8 @@ pub struct Edge {
 }
 
 /// Per-device changes.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Override {
     /// Changes per node id.
@@ -376,7 +394,8 @@ pub struct Override {
 }
 
 /// Changes to one node on one device.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct NodeOverride {
     /// Leave this block out on this device.
@@ -503,6 +522,43 @@ mod tests {
         let flow = Flow::from_json(MINIMAL).unwrap();
         let again = Flow::from_json(&flow.to_json().unwrap()).unwrap();
         assert_eq!(flow, again);
+    }
+
+    // Why: the editor loads a scenario, edits it as plain JSON in the UI and
+    //      writes it back. Every shipped example must survive that trip with
+    //      nothing lost, and saving twice must give the same text (no
+    //      ever-changing diffs in a project folder).
+    #[test]
+    fn every_example_round_trips_through_json() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if !path.to_string_lossy().ends_with(".srflow.json") {
+                continue;
+            }
+            let flow = Flow::from_json(&std::fs::read_to_string(&path).unwrap())
+                .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+            let text = flow.to_json().unwrap();
+            let again = Flow::from_json(&text).unwrap();
+            assert_eq!(flow, again, "{}", path.display());
+            assert_eq!(text, again.to_json().unwrap(), "{}", path.display());
+            checked += 1;
+        }
+        assert!(
+            checked >= 6,
+            "expected the examples folder, found {checked} files"
+        );
+    }
+
+    #[test]
+    fn empty_draft_scenario_parses() {
+        // A new project starts with an empty canvas (HANDOFF D-39): no nodes,
+        // no arrows. Parsing must accept it; validation reports it at render.
+        let draft = r#"{ "format_version": 1, "meta": { "name": "t" },
+          "targets": [], "pages": [], "nodes": [], "edges": [] }"#;
+        let flow = Flow::from_json(draft).unwrap();
+        assert!(flow.nodes.is_empty() && flow.edges.is_empty());
     }
 
     #[test]

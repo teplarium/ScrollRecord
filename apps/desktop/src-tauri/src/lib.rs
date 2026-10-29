@@ -35,7 +35,25 @@ pub fn run() {
                     None
                 }
             };
-            app.manage(state::AppState::new(guard));
+            // ── Project store ──
+            // Paths come from Tauri so `sr-project` stays Tauri-free. If the
+            // OS can't name a folder (very unusual), fall back to the home
+            // or temp folder rather than refusing to start.
+            let fallback = app
+                .path()
+                .home_dir()
+                .unwrap_or_else(|_| std::env::temp_dir());
+            let config_dir = app
+                .path()
+                .app_config_dir()
+                .unwrap_or_else(|_| fallback.join(".scrollrecord"));
+            let documents = app.path().document_dir().unwrap_or(fallback);
+            let projects = sr_project::ProjectStore::new(
+                config_dir,
+                documents.join("ScrollRecord"),
+                env!("CARGO_PKG_VERSION"),
+            );
+            app.manage(state::AppState::new(guard, projects));
             tracing::info!(
                 version = env!("CARGO_PKG_VERSION"),
                 "ScrollRecord desktop started"
@@ -47,15 +65,35 @@ pub fn run() {
         // sync with `commands/mod.rs` and the "IPC map" in PROJECT_MAP.md.
         .invoke_handler(tauri::generate_handler![
             commands::app::app_info,
+            commands::project::project_home,
             commands::project::create_project,
             commands::project::open_project,
+            commands::project::save_project,
+            commands::project::close_project,
+            commands::project::forget_recent,
+            commands::project::import_flow,
+            commands::project::export_flow,
         ])
-        .run(tauri::generate_context!());
+        .build(tauri::generate_context!());
 
-    // `run` only returns an error if the window system could not start.
-    if let Err(err) = result {
-        tracing::error!(error = %err, "desktop app failed to start");
-        eprintln!("ScrollRecord failed to start: {err}");
-        std::process::exit(1);
-    }
+    // `build` only fails if the window system could not start.
+    let app = match result {
+        Ok(app) => app,
+        Err(err) => {
+            tracing::error!(error = %err, "desktop app failed to start");
+            eprintln!("ScrollRecord failed to start: {err}");
+            std::process::exit(1);
+        }
+    };
+
+    // ── Shutdown ────────────────────────────────────────────────────────────
+    // Why: open projects hold a lock file; leaving it behind would make the
+    //      next start ask "open anyway?" for every restored tab.
+    app.run(|handle, event| {
+        if let tauri::RunEvent::Exit = event
+            && let Some(state) = handle.try_state::<state::AppState>()
+        {
+            state.release_all();
+        }
+    });
 }

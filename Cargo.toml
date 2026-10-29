@@ -37,6 +37,7 @@ sr-encoder = { path = "crates/sr-encoder" }
 sr-render = { path = "crates/sr-render" }
 sr-cursor = { path = "crates/sr-cursor" }
 sr-compositor = { path = "crates/sr-compositor" }
+sr-project = { path = "crates/sr-project" }
 
 # External crates
 base64 = "0.23"

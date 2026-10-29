@@ -10,10 +10,12 @@
 //!          `testid` → `css` → `role`+`name` → `text` → `xpath`.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// One way to find an element. Exactly one strategy field must be set
 /// (`name` only together with `role`).
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Locator {
     /// Value of a `data-sr="…"` attribute — the recommended way.

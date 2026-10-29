@@ -9,9 +9,16 @@
 //!          call library code and return these types.
 //! Rules:   only plain data (serde + ts-rs). No logic beyond simple
 //!          constructors. Every exported type gets `#[ts(export)]`.
+//!          Types owned by a library crate (errors and the scenario in
+//!          `sr-core`, project data in `sr-project`) are defined there and
+//!          re-exported here, so the whole contract is visible in one place.
 //! See also: `apps/desktop/src/shared/ipc/` (TypeScript side of the contract).
 
 pub mod app_info;
 
 pub use app_info::AppInfo;
+pub use sr_core::flow::Flow;
 pub use sr_core::{AppError, AppResult, ErrorCode};
+pub use sr_project::{
+    ImportedFlow, NewProject, OpenedProject, ProjectHome, ProjectManifest, RecentProject,
+};

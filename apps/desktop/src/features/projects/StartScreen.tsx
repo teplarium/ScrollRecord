@@ -1,24 +1,36 @@
 /**
  * StartScreen — first screen of the app: create / open a project, recent list.
- * Phase 0: the buttons call real IPC commands that answer SR-0002
- * ("planned for phase 3"). That proves the whole chain works end to end:
- * click → Rust command → typed AppError → translated banner.
- * Phase 3 replaces the command bodies; this component barely changes.
+ * Step 3.1a: the project commands exist in Rust (`commands.createProject`
+ * etc.), but they need a folder, a name and a site, which the new-project
+ * form and the folder picker provide in step 3.1b. Until then the buttons
+ * show SR-0002 ("planned") through the same error banner as before.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { commands, type IpcResult } from "../../shared/ipc/commands";
+import type { IpcResult } from "../../shared/ipc/commands";
+import { appError } from "../../shared/ipc/errors";
 import type { AppError } from "../../shared/ipc/generated/AppError";
 import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import { FolderOpenIcon, PlusIcon } from "../../shared/ui/icons";
 import "./StartScreen.css";
 
+/** Placeholder until the step 3.1b form calls the real commands. */
+function formPending(): Promise<IpcResult<null>> {
+  return Promise.resolve({
+    ok: false,
+    error: appError("SR-0002", "project form arrives in step 3.1b", {
+      feature: "project form",
+      phase: "3",
+    }),
+  });
+}
+
 export function StartScreen() {
   const { t } = useTranslation();
   const [error, setError] = useState<AppError | null>(null);
 
-  // Runs a command and shows its error, if any. Success handling arrives in Phase 3.
+  // Runs an action and shows its error, if any.
   async function run(action: () => Promise<IpcResult<null>>) {
     setError(null);
     const result = await action();
@@ -37,7 +49,7 @@ export function StartScreen() {
         <button
           type="button"
           className="start__card start__card--primary"
-          onClick={() => void run(commands.createProject)}
+          onClick={() => void run(formPending)}
         >
           <span className="start__card-icon">
             <PlusIcon />
@@ -45,11 +57,7 @@ export function StartScreen() {
           <span className="start__card-title">{t("start.newProject")}</span>
           <span className="start__card-hint">{t("start.newProjectHint")}</span>
         </button>
-        <button
-          type="button"
-          className="start__card"
-          onClick={() => void run(commands.openProject)}
-        >
+        <button type="button" className="start__card" onClick={() => void run(formPending)}>
           <span className="start__card-icon">
             <FolderOpenIcon />
           </span>

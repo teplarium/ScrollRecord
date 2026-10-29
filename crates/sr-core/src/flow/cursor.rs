@@ -7,6 +7,7 @@
 //!          reproducible while the movement still looks natural.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use super::Point;
 
@@ -14,7 +15,8 @@ use super::Point;
 pub const DEFAULT_CURSOR_PACK: &str = "classic-dark";
 
 /// Scenario-wide cursor settings (`defaults.cursor`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct CursorSettings {
     /// Built-in pack id (`classic-dark`, `classic-light`) or a folder with a
@@ -88,7 +90,8 @@ impl CursorSettings {
 }
 
 /// What the cursor does while the page scrolls along an arrow.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum ScrollCursor {
     /// Stays where it is on screen (like a hand resting on the mouse).
@@ -101,7 +104,8 @@ pub enum ScrollCursor {
 }
 
 /// The cursor image to show, decided by the page under the pointer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum CursorKind {
     /// Normal arrow.

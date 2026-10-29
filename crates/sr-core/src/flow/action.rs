@@ -11,11 +11,13 @@
 //!          follow links. That's why clicks default to `visual` (no press).
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use super::Locator;
 
 /// What an action does.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum ActionKind {
     /// Move to an element and rest on it (hover styles appear).
@@ -29,7 +31,8 @@ pub enum ActionKind {
 }
 
 /// Whether the site receives the pointer events (HANDOFF D-25).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(rename_all = "snake_case")]
 pub enum PointerMode {
     /// Real events: the site reacts like for a visitor.
@@ -42,7 +45,8 @@ pub enum PointerMode {
 }
 
 /// A point inside a block: fractions of its width and height (0..1).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Point {
     /// 0 = left edge, 1 = right edge.
@@ -52,7 +56,8 @@ pub struct Point {
 }
 
 /// One step inside a block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct Action {
     /// `hover`, `click`, `move` or `wait`.

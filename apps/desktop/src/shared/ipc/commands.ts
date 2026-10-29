@@ -18,6 +18,12 @@ import { invoke, isTauri, type InvokeArgs } from "@tauri-apps/api/core";
 import { appError, toAppError } from "./errors";
 import type { AppError } from "./generated/AppError";
 import type { AppInfo } from "./generated/AppInfo";
+import type { Flow } from "./generated/Flow";
+import type { ImportedFlow } from "./generated/ImportedFlow";
+import type { NewProject } from "./generated/NewProject";
+import type { OpenedProject } from "./generated/OpenedProject";
+import type { ProjectHome } from "./generated/ProjectHome";
+import type { JsonValue } from "./generated/serde_json/JsonValue";
 
 /** Outcome of an IPC call: either a value or a typed error. */
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: AppError };
@@ -39,8 +45,25 @@ async function call<T>(command: string, args?: InvokeArgs): Promise<IpcResult<T>
 export const commands = {
   /** Versions and platform. Rust: `commands::app::app_info`. */
   appInfo: () => call<AppInfo>("app_info"),
-  /** Create a project (Phase 3; returns SR-0002 for now). Rust: `commands::project::create_project`. */
-  createProject: () => call<null>("create_project"),
-  /** Open a project (Phase 3; returns SR-0002 for now). Rust: `commands::project::open_project`. */
-  openProject: () => call<null>("open_project"),
+
+  // ── Projects (Rust: `commands::project`, logic in `crates/sr-project`) ──
+  // A project is identified by its folder `dir`: several can be open as tabs.
+
+  /** Recent projects, tabs to restore, suggested location for a new project. */
+  projectHome: () => call<ProjectHome>("project_home"),
+  /** Create a project folder and open it. Errors: SR-1006, SR-1002, SR-1001, SR-2001, SR-2003. */
+  createProject: (request: NewProject) => call<OpenedProject>("create_project", { request }),
+  /** Open a project; `force` = "open anyway" after SR-1005. Errors: SR-1003, SR-1004, SR-1005, SR-2001. */
+  openProject: (dir: string, force = false) => call<OpenedProject>("open_project", { dir, force }),
+  /** Save scenario and layout (autosave). Errors: SR-1003, SR-1002. */
+  saveProject: (dir: string, flow: Flow, layout: JsonValue) =>
+    call<null>("save_project", { dir, flow, layout }),
+  /** Close a project tab (releases its lock). */
+  closeProject: (dir: string) => call<null>("close_project", { dir }),
+  /** Remove a project from the recent list; the folder is not touched. */
+  forgetRecent: (dir: string) => call<null>("forget_recent", { dir }),
+  /** Read a scenario file to import into the open project `dir` (nothing is written). */
+  importFlow: (dir: string, file: string) => call<ImportedFlow>("import_flow", { dir, file }),
+  /** Write the project's scenario as one file with the layout embedded. */
+  exportFlow: (dir: string, dest: string) => call<null>("export_flow", { dir, dest }),
 } as const;

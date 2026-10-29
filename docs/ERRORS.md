@@ -62,6 +62,34 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 - **Common causes:** the output folder doesn't exist and can't be created; disk full; the video is still open in a player (Windows locks open files); no permission.
 - **What to do:** close any player showing the old video, check free space, or choose another output folder with `--out`.
 
+## SR-1003
+
+**The folder is not a ScrollRecord project.** A project folder holds `project.json` next to `flow.srflow.json` and `layout.json`.
+
+- **Common causes:** the wrong folder was picked (e.g. the site folder or `renders/`); `project.json` was deleted or edited by hand and is no longer valid JSON (`detail` parameter).
+- **What to do:** pick the folder that contains `project.json`. If it is broken, `project.json.bak` next to it holds the previous version: rename it to `project.json`.
+- **For developers:** `crates/sr-project/src/manifest.rs`.
+
+## SR-1004
+
+**The project was saved by a newer ScrollRecord.** Its `project_format` is higher than this version reads.
+
+- **What to do:** update ScrollRecord.
+
+## SR-1005
+
+**The project is already open elsewhere.** The project folder has a `.scrollrecord.lock` file from another ScrollRecord window (`pid` parameter).
+
+- **Common causes:** the same project is open in a second ScrollRecord window; or ScrollRecord crashed and left the lock behind.
+- **What to do:** switch to the other window. After a crash, choose "Open anyway". Two windows saving one project overwrite each other's changes.
+- **For developers:** `crates/sr-project/src/lock.rs`.
+
+## SR-1006
+
+**A folder with this project name already exists** in the chosen location (`path` parameter). ScrollRecord never overwrites an existing folder.
+
+- **What to do:** choose another name or location, or leave the name empty to get "Untitled N".
+
 ## SR-2001
 
 **The scenario file could not be parsed.** It's not valid JSON, or a field has the wrong name or type. The message includes the `line` and `column`.

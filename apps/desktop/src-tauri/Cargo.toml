@@ -21,6 +21,7 @@ tauri-build.workspace = true
 
 [dependencies]
 sr-core.workspace = true
+sr-project.workspace = true
 sr-ipc.workspace = true
 sr-diagnostics.workspace = true
 serde.workspace = true

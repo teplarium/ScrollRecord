@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.1a — projects under the hood
+- The app can now create, open, save and close projects (the buttons on the start screen arrive in the next step). A project is a folder with the scenario (the same file the command line renders), the canvas layout, a cache folder and a renders folder.
+- Saving can never leave a half-written file, even if the computer switches off mid-save; the previous version of each file is kept as `.bak`.
+- A new project without a name is called "Untitled 1", "Untitled 2"… A new project starts with an empty canvas and one video format, Desktop 16:9 1080p.
+- If the same project is already open in another ScrollRecord window, or was left "open" by a crash, ScrollRecord says so (SR-1005) and lets you open it anyway.
+- The site folder is stored relative to the project when it is inside or next to it, so the two can be moved or copied together.
+- A scenario file can be imported into a project and exported from it (with the canvas layout inside).
+- The app remembers the last 10 projects, the folder used for the last new project, and which projects were open, to reopen them next time.
+- New error codes SR-1003…SR-1006 (not a project, project from a newer version, project already open, folder name taken).
+
 ### Before the editor — render speed report and lower priority
 - After each video, `scrollrecord render` now shows where the time went: browser start, page loading, finding the buttons, moving the page frame by frame, screenshots, drawing the cursor and encoding. `--json` includes the same numbers (`stages`). This tells us what to speed up next.
 - While rendering, Chrome and ffmpeg now run at "below normal" priority, so the computer stays responsive (music, browser, typing). The video is exactly the same; it only takes longer when other programs are busy (on an idle computer the speed is unchanged). `--normal-priority` turns this off. On Windows, Chrome keeps the page itself and its graphics part at normal priority; the heaviest parts (video encoding, screenshots) run lower. On Linux only ffmpeg runs lower: a low-priority Chrome could take too long to start on a busy computer, so the browser keeps normal priority there.
