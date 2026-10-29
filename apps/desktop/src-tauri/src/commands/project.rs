@@ -85,6 +85,18 @@ pub async fn import_flow(
         .import_flow(Path::new(&dir), Path::new(&file))
 }
 
+/// How a picked site folder or address is written into the project's
+/// scenario (`meta.site`), e.g. after "Locate site folder…". `null` for an
+/// empty input.
+#[tauri::command]
+pub async fn portable_site(
+    state: State<'_, AppState>,
+    dir: String,
+    site: String,
+) -> Result<Option<String>, AppError> {
+    Ok(state.projects().portable_site(Path::new(&dir), &site))
+}
+
 /// Writes the project's scenario as one file with the layout embedded.
 /// Errors: SR-1003, SR-2001, SR-1002.
 #[tauri::command]

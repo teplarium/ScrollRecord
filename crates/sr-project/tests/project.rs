@@ -213,6 +213,16 @@ fn a_moved_site_folder_is_reported_not_fatal() {
     fs::remove_dir(&site).unwrap();
     let opened = store.open(&dir, false).unwrap();
     assert!(opened.site_missing);
+
+    // "Locate site folder…": the new place is stored portably and, once
+    // saved, the project no longer reports a missing site.
+    let moved = sb.location().join("новый сайт");
+    fs::create_dir(&moved).unwrap();
+    let mut flow = opened.flow;
+    flow.meta.site = store.portable_site(&dir, &moved.display().to_string());
+    assert_eq!(flow.meta.site.as_deref(), Some("../новый сайт"));
+    store.save(&dir, &flow, &opened.layout).unwrap();
+    assert!(!store.open(&dir, false).unwrap().site_missing);
 }
 
 // ── Import and export ───────────────────────────────────────────────────────

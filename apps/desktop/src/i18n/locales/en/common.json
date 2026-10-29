@@ -3,11 +3,10 @@
     "languageName": "English"
   },
   "app": {
-    "name": "ScrollRecord",
-    "tagline": "Smooth website scroll videos, from desktop to mobile"
+    "name": "ScrollRecord"
   },
   "start": {
-    "badge": "Foundation build · Phase 0",
+    "badge": "Editor preview · Phase 3",
     "heading": "Start a recording project",
     "subheading": "Point ScrollRecord at a website, mark the blocks to show, and render a smooth scroll video for every device.",
     "newProject": "New project",
@@ -15,7 +14,9 @@
     "openProject": "Open project",
     "openProjectHint": "Continue a project you saved before",
     "recent": "Recent projects",
-    "recentEmpty": "No projects yet. They will show up here once you create one."
+    "recentEmpty": "No projects yet. They will show up here once you create one.",
+    "openDialogTitle": "Choose a project folder",
+    "openAnyway": "Open anyway"
   },
   "footer": {
     "loading": "Connecting to the core…",
@@ -27,6 +28,59 @@
   "common": {
     "dismiss": "Dismiss",
     "errorCode": "Error {{code}}"
+  },
+  "tabs": {
+    "label": "Open projects",
+    "home": "Home",
+    "newProject": "New project",
+    "close": "Close {{name}}"
+  },
+  "recent": {
+    "missing": "Folder not found",
+    "forget": "Remove from list"
+  },
+  "newProject": {
+    "title": "New project",
+    "name": "Name",
+    "namePlaceholder": "Untitled N",
+    "nameHint": "Leave empty to get “Untitled 1”, “Untitled 2”…",
+    "untitled": "Untitled",
+    "location": "Location",
+    "choose": "Choose…",
+    "pickLocation": "Where to create the project",
+    "site": "Website",
+    "siteFolder": "Folder",
+    "siteUrl": "Address",
+    "siteFolderPlaceholder": "No folder chosen",
+    "siteFolderHint": "The folder with the site's index.html.",
+    "siteUrlPlaceholder": "http://localhost:5173",
+    "siteUrlHint": "Your running dev server, starting with http:// or https://.",
+    "pickSite": "Choose the site folder",
+    "startWith": "Start with",
+    "startEmpty": "Empty canvas",
+    "startImport": "Scenario file",
+    "importPlaceholder": "No file chosen",
+    "importHint": "If you leave the website empty, the one named in the file is used.",
+    "pickScenario": "Choose a scenario file",
+    "scenarioFilter": "ScrollRecord scenario",
+    "cancel": "Cancel",
+    "create": "Create project",
+    "creating": "Creating…"
+  },
+  "editor": {
+    "folder": "Project folder",
+    "site": "Website",
+    "noSite": "No website set",
+    "videos": "Video formats",
+    "videosValue_one": "{{count}} format",
+    "videosValue_other": "{{count}} formats",
+    "nodes": "Scenario",
+    "nodesValue_one": "{{count}} shape",
+    "nodesValue_other": "{{count}} shapes",
+    "siteMissing": "The site folder wasn't found: {{site}}. It may have been moved or renamed.",
+    "locate": "Locate site folder…",
+    "locateTitle": "Choose the site folder",
+    "comingNext": "The canvas arrives in the next step (3.2)."
   },
   "errors": {
     "SR-0001": "Something unexpected went wrong inside ScrollRecord. This is a bug — please report it and mention {{code}}.",

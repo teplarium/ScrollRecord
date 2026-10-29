@@ -1,36 +1,17 @@
-/* Window frame: header / screen / footer. Screen-specific styles live next to
+/* Window frame: tab bar (TabBar.css) / screen / footer. Screen-specific styles live next to
    each feature (e.g. features/projects/StartScreen.css). */
 
 .app {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.app__header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-6);
-  border-bottom: 1px solid var(--border);
-}
-
-.app__rec {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
-}
-
-.app__brand {
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
-.app__tagline {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
+/* The shown screen scrolls by itself, so the tabs and footer stay put. */
+.app > main {
+  min-height: 0;
+  overflow: auto;
 }
 
 .app__footer {

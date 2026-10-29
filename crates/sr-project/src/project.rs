@@ -279,6 +279,14 @@ impl ProjectStore {
         self.update_config(|c| c.forget(&shown));
     }
 
+    /// How a site folder or address picked by the user is written into the
+    /// scenario of the project at `dir` (relative when inside or next to the
+    /// project, else absolute; URLs unchanged). The UI puts the result into
+    /// `flow.meta.site` itself, so the change is part of its undo history.
+    pub fn portable_site(&self, dir: &Path, site: &str) -> Option<String> {
+        site::rebase(Some(site), dir, dir)
+    }
+
     /// Reads a scenario file for importing into the project at `dir`
     /// (nothing is written: the UI puts it into its undo history).
     ///

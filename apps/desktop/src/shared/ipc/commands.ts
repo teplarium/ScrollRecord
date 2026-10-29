@@ -62,6 +62,8 @@ export const commands = {
   closeProject: (dir: string) => call<null>("close_project", { dir }),
   /** Remove a project from the recent list; the folder is not touched. */
   forgetRecent: (dir: string) => call<null>("forget_recent", { dir }),
+  /** How a picked site folder/address is written into `meta.site` of project `dir`. */
+  portableSite: (dir: string, site: string) => call<string | null>("portable_site", { dir, site }),
   /** Read a scenario file to import into the open project `dir` (nothing is written). */
   importFlow: (dir: string, file: string) => call<ImportedFlow>("import_flow", { dir, file }),
   /** Write the project's scenario as one file with the layout embedded. */

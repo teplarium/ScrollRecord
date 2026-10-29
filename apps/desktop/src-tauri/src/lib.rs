@@ -19,6 +19,8 @@ use tauri::Manager;
 /// Builds and runs the desktop application. Blocks until the window closes.
 pub fn run() {
     let result = tauri::Builder::default()
+        // Native folder / file pickers for the start screen (ADR 0006 §1).
+        .plugin(tauri_plugin_dialog::init())
         // ── Startup ─────────────────────────────────────────────────────────
         // Why: logs must start before anything else can fail, so even
         //      startup problems end up in the log file (HANDOFF NFR-07).
@@ -73,6 +75,7 @@ pub fn run() {
             commands::project::forget_recent,
             commands::project::import_flow,
             commands::project::export_flow,
+            commands::project::portable_site,
         ])
         .build(tauri::generate_context!());
 

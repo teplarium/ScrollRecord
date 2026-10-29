@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.1b — project tabs and the start screen
+- Projects open as tabs at the top of the window, like files in Figma: a Home tab, one tab per project, and "+" for a new project. Closing the app and opening it again brings the same tabs back.
+- "New project" asks for a name (empty gives "Untitled 1", "Untitled 2"…), where to create it (first `Documents\ScrollRecord`, then the last folder used), the website (a folder, or a `http://localhost…` address) and whether to start empty or from a scenario file.
+- "Open project" and the recent list open a project folder; a project that is already open just switches to its tab. A project left "open" by a crash can be opened with "Open anyway". Projects whose folder is gone are shown greyed out and can be removed from the list.
+- A project tab shows the project's name, folder, website and video formats until the canvas arrives. If the site folder was moved, it says so and offers "Locate site folder…".
+
 ### Editor, step 3.1a — projects under the hood
 - The app can now create, open, save and close projects (the buttons on the start screen arrive in the next step). A project is a folder with the scenario (the same file the command line renders), the canvas layout, a cache folder and a renders folder.
 - Saving can never leave a half-written file, even if the computer switches off mid-save; the previous version of each file is kept as `.bak`.

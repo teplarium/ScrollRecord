@@ -27,6 +27,7 @@ sr-diagnostics.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri.workspace = true
+tauri-plugin-dialog.workspace = true
 tracing.workspace = true
 
 [lints]
