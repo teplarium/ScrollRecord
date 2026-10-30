@@ -176,7 +176,40 @@
 
 .site-map__chevron-space {
   flex: none;
-  width: 12px;
+  width: 20px;
+}
+
+/* A block line: the chevron expands it, the rest adds or shows it. */
+.site-map__line {
+  display: flex;
+  align-items: center;
+}
+
+.site-map__chevron-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.site-map__chevron-button:hover {
+  background: var(--surface-raised);
+}
+
+.site-map__row--source {
+  flex: 1;
+  min-width: 0;
+}
+
+.site-map__row--source[draggable="true"] {
+  cursor: grab;
 }
 
 .site-map__icon {

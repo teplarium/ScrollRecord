@@ -4,14 +4,37 @@
  * Each is `memo`: React Flow re-renders shapes on every pan and zoom, and a
  * scenario can hold 200+ of them (NFR-05). Sizes are set by `toReactFlow.ts`
  * (block cards in the current device's shape, D-39); here they only fill it.
- * Handles are where arrows attach: in at the top, out at the bottom. Pulling
- * new arrows out of them comes with editing (step 3.4).
+ * Handles are where arrows attach: one on each side, shown on hover. An arrow
+ * is pulled out of any side (FR-CNV-08); under each "out" handle sits an
+ * invisible "in" handle (`<side>-in`) where arrows arrive. Start has only
+ * "out", End only "in" — the path begins and ends there.
  */
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { BlockData, NavigateData, TerminalData } from "./toReactFlow";
+
+const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
+
+/** The handles of a shape: arrows out (`out`), arrows in (`in`), or both. */
+function Handles({ out = true, into = true }: { out?: boolean; into?: boolean }) {
+  return (
+    <>
+      {into &&
+        SIDES.map((side) => (
+          <Handle
+            key={`${side}-in`}
+            id={`${side}-in`}
+            type="target"
+            position={side}
+            className="canvas-handle--in"
+          />
+        ))}
+      {out && SIDES.map((side) => <Handle key={side} id={side} type="source" position={side} />)}
+    </>
+  );
+}
 
 /** "1.5 s" / "No stop" — how long the video stays on a shape. */
 function useHoldText() {
@@ -27,12 +50,11 @@ export const TerminalShape = memo(function TerminalShape({
   const isStart = data.kind === "start";
   return (
     <div className={`canvas-terminal canvas-terminal--${data.kind}`}>
-      {!isStart && <Handle type="target" position={Position.Top} isConnectable={false} />}
+      <Handles out={isStart} into={!isStart} />
       <span className="canvas-terminal__name">{isStart ? t("canvas.start") : t("canvas.end")}</span>
       {data.holdMs !== null && data.holdMs > 0 && (
         <span className="canvas-terminal__hold">{holdText(data.holdMs)}</span>
       )}
-      {isStart && <Handle type="source" position={Position.Bottom} isConnectable={false} />}
     </div>
   );
 });
@@ -42,7 +64,7 @@ export const BlockShape = memo(function BlockShape({ data }: NodeProps<Node<Bloc
   const holdText = useHoldText();
   return (
     <div className="canvas-block">
-      <Handle type="target" position={Position.Top} isConnectable={false} />
+      <Handles />
       <header className="canvas-block__header">
         <span className="canvas-block__name">{data.name}</span>
         <span className="canvas-block__hold">{holdText(data.holdMs)}</span>
@@ -54,7 +76,6 @@ export const BlockShape = memo(function BlockShape({ data }: NodeProps<Node<Bloc
           {t("canvas.actions", { count: data.actions })}
         </footer>
       )}
-      <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </div>
   );
 });
@@ -65,11 +86,10 @@ export const NavigateShape = memo(function NavigateShape({
   const { t } = useTranslation();
   return (
     <div className="canvas-navigate">
-      <Handle type="target" position={Position.Top} isConnectable={false} />
+      <Handles />
       <span>
         {data.toPage ? t("canvas.navigateTo", { page: data.toPage }) : t("canvas.navigate")}
       </span>
-      <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </div>
   );
 });

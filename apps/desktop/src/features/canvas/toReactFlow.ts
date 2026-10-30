@@ -5,15 +5,19 @@
  * without a browser; `Canvas.tsx` only renders the result. Positions come
  * from `layout.json` where saved, otherwise from `autoLayout` (FR-CNV-12).
  * Block cards take the current device's shape (D-39), so switching the device
- * rebuilds the shapes; the arrows stay the same.
+ * rebuilds the shapes; the arrows stay the same. Shapes that would overlap on
+ * this device are shown pushed apart (`separate.ts`, never saved).
+ * Each arrow leaves and enters on the sides that face each other, so a column
+ * reads top to bottom and a branch to the right reads left to right.
  */
-import { MarkerType, type Edge, type Node } from "@xyflow/react";
+import { MarkerType, Position, type Edge, type Node } from "@xyflow/react";
 
 import type { Flow } from "../../shared/ipc/generated/Flow";
 import type { FlowNode } from "../../shared/ipc/generated/FlowNode";
 import { autoLayout } from "./autoLayout";
 import { shapeSize, type Size } from "./cardSize";
-import type { CanvasLayout } from "./layout";
+import type { CanvasLayout } from "../../shared/store/layout";
+import { separate } from "./separate";
 
 export type TerminalData = { kind: "start" | "end"; holdMs: number | null };
 export type BlockData = { name: string; holdMs: number; actions: number };
@@ -50,36 +54,74 @@ export function buildCanvas(flow: Flow, layout: CanvasLayout, card: Size): Canva
   const sizeOf = (node: FlowNode) => shapeSize(node, card);
   const auto = autoLayout(flow.nodes, flow.edges, sizeOf);
 
-  const nodes = flow.nodes.map((node): CanvasNode => {
+  const placed = flow.nodes.map((node): CanvasNode => {
     const { width, height } = sizeOf(node);
     return {
       id: node.id,
       position: layout.nodes[node.id] ?? auto[node.id] ?? { x: 0, y: 0 },
       width,
       height,
-      // Read-only until step 3.4 (moving and connecting are edits).
-      draggable: false,
-      connectable: false,
       ...nodeData(node, flow),
     } as CanvasNode;
   });
+  const pushed = separate(
+    placed.map((n) => ({ ...n, width: n.width ?? 0, height: n.height ?? 0 })),
+  );
+  const nodes = placed.map((n) => {
+    const position = pushed.get(n.id);
+    return position ? { ...n, position } : n;
+  });
 
   // Arrows to a missing node are skipped here; validation reports them.
-  const ids = new Set(flow.nodes.map((n) => n.id));
-  const edges = flow.edges
-    .filter((e) => ids.has(e.from) && ids.has(e.to))
-    .map((e, i): Edge => ({
-      // Two arrows may join the same nodes, so the index keeps ids unique.
-      id: `${i}:${e.from}->${e.to}`,
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const edges: Edge[] = [];
+  flow.edges.forEach((e, i) => {
+    const from = byId.get(e.from);
+    const to = byId.get(e.to);
+    if (!from || !to) return;
+    const [out, into] = facingSides(from, to);
+    edges.push({
+      // The index keeps ids unique and tells edits which arrow it is.
+      id: edgeId(i, e.from, e.to),
       source: e.from,
       target: e.to,
+      sourceHandle: out,
+      targetHandle: `${into}-in`,
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-      // Arrow properties are edited from step 3.5; until then only shapes select.
-      selectable: false,
-      focusable: false,
-    }));
+    });
+  });
 
   return { nodes, edges };
+}
+
+/** Arrow id on the canvas: `<index in flow.edges>:<from>-><to>`. */
+export function edgeId(index: number, from: string, to: string) {
+  return `${index}:${from}->${to}`;
+}
+
+/** Index in `flow.edges` of a canvas arrow id (see `edgeId`). */
+export function edgeIndex(id: string): number | null {
+  const index = Number.parseInt(id, 10);
+  return Number.isInteger(index) && index >= 0 ? index : null;
+}
+
+/**
+ * Which side an arrow leaves `from` and enters `to`: below → bottom/top,
+ * above → top/bottom, otherwise right/left or left/right.
+ */
+export function facingSides(from: CanvasNode, to: CanvasNode): [Position, Position] {
+  const a = box(from);
+  const b = box(to);
+  if (b.top >= a.bottom) return [Position.Bottom, Position.Top];
+  if (b.bottom <= a.top) return [Position.Top, Position.Bottom];
+  return b.left + b.right >= a.left + a.right
+    ? [Position.Right, Position.Left]
+    : [Position.Left, Position.Right];
+}
+
+function box(n: CanvasNode) {
+  const { x, y } = n.position;
+  return { left: x, top: y, right: x + (n.width ?? 0), bottom: y + (n.height ?? 0) };
 }
 
 /** How many shapes the canvas frames when a scenario is opened. */

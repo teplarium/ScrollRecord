@@ -4,13 +4,19 @@
  * tab) or a project tab (HANDOFF D-38). Features never import each other,
  * so this file wires them together with callbacks.
  * At startup the projects that were open last time come back as tabs (D-39).
+ * Nothing is lost on close: a tab is saved before it closes, and all tabs
+ * are saved before the window closes (a failed save keeps the tab or the
+ * window open once and shows the error; closing the window again quits).
  */
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useReducer, useState } from "react";
 
 import { Editor } from "../features/editor/Editor";
 import { openFailure, StartScreen, type OpenFailure } from "../features/projects/StartScreen";
 import { commands } from "../shared/ipc/commands";
 import type { OpenedProject } from "../shared/ipc/generated/OpenedProject";
+import { closeProjectStore, saveAllProjects } from "../shared/store/projectStore";
 import { AppFooter } from "./AppFooter";
 import { TabBar } from "./TabBar";
 import { activeProject, initialTabs, sameDir, tabsReducer } from "./tabs";
@@ -51,6 +57,19 @@ export function App() {
     };
   }, []);
 
+  // ── Save every tab before the window closes ──
+  useEffect(() => {
+    if (!isTauri()) return;
+    let warned = false;
+    const stop = getCurrentWindow().onCloseRequested(async (event) => {
+      if ((await saveAllProjects()) || warned) return;
+      // The error is shown in the tab; a second close quits anyway.
+      warned = true;
+      event.preventDefault();
+    });
+    return () => void stop.then((unlisten) => unlisten());
+  }, []);
+
   function showHome(withForm: boolean) {
     setFormOnHome(withForm);
     setHomeKey((k) => k + 1);
@@ -63,7 +82,12 @@ export function App() {
   }
 
   async function close(dir: string) {
-    // Closing never fails in Rust (a stale lock is only logged).
+    // Unsaved edits are written first; if that fails the tab stays open and
+    // shows the error. Closing never fails in Rust (a stale lock is only logged).
+    if (!(await closeProjectStore(dir))) {
+      dispatch({ type: "activate", dir });
+      return;
+    }
     await commands.closeProject(dir);
     dispatch({ type: "closed", dir });
   }
@@ -81,11 +105,7 @@ export function App() {
         onNew={() => showHome(true)}
       />
       {shown ? (
-        <Editor
-          key={shown.dir}
-          project={shown}
-          onChange={(project) => dispatch({ type: "updated", project })}
-        />
+        <Editor key={shown.dir} project={shown} />
       ) : (
         <StartScreen
           key={homeKey}

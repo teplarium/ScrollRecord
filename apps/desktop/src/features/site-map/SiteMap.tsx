@@ -6,19 +6,25 @@
  * collapse like Figma layers. Blocks and elements come from the site itself
  * (`sr-analyzer`, run by `useSiteMap`): `data-sr` blocks plus the blocks the
  * scenario uses; blocks already in the scenario are marked, blocks the
- * scenario names but this device doesn't have get a warning.
- * Dragging rows onto the canvas comes in step 3.4, pictures in 3.6.
+ * scenario names but this device doesn't have get a warning. Pictures: 3.6.
+ *
+ * Putting things on the canvas (FR-CNV-07): drag Start, End or a block onto
+ * it, or click the row — the shape appears in the middle of the visible
+ * canvas. A row already on the canvas (Start, End, a used block) is shown
+ * there on click instead; a second copy of a block is added by dragging.
+ * The chevron expands a block; its elements become cursor actions in 3.5.
  *
  * The project's website is shown at the top; a site folder that was moved
  * (`siteMissing`) is reported here with "Locate site folder…".
  */
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ElementKind } from "../../shared/ipc/generated/ElementKind";
 import type { Flow } from "../../shared/ipc/generated/Flow";
 import type { PageMap } from "../../shared/ipc/generated/PageMap";
 import type { SiteBlock } from "../../shared/ipc/generated/SiteBlock";
+import { NODE_SOURCE_MIME, type NodeSource } from "../../shared/store/edits";
 import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import { WarningIcon } from "../../shared/ui/icons";
 import { KindIcon, RescanIcon, ChevronIcon } from "./icons";
@@ -32,9 +38,34 @@ type Props = {
   onLocateSite: () => void;
   /** The site map job of this tab (`useSiteMap`). */
   siteMap: ReturnType<typeof useSiteMap>;
+  /** A row was clicked: put it in the middle of the visible canvas. */
+  onAdd: (source: NodeSource) => void;
+  /** A row already on the canvas was clicked: select and show that node. */
+  onShow: (nodeId: string) => void;
 };
 
-export function SiteMap({ flow, siteMissing, onLocateSite, siteMap }: Props) {
+/** Starts dragging a row onto the canvas (`Canvas.tsx` reads it on drop). */
+function dragSource(source: NodeSource) {
+  return (event: DragEvent) => {
+    event.dataTransfer.setData(NODE_SOURCE_MIME, JSON.stringify(source));
+    event.dataTransfer.effectAllowed = "copy";
+  };
+}
+
+/**
+ * The scenario node a site block is, if any: the node the analyzer matched,
+ * or (added since the last read) a block on that page with the same locators.
+ */
+function usedNode(flow: Flow, pageId: string, block: SiteBlock): string | null {
+  if (block.node && flow.nodes.some((n) => n.id === block.node)) return block.node;
+  const locators = JSON.stringify(block.locators);
+  const node = flow.nodes.find(
+    (n) => n.kind === "block" && n.page === pageId && JSON.stringify(n.target) === locators,
+  );
+  return node?.id ?? null;
+}
+
+export function SiteMap({ flow, siteMissing, onLocateSite, siteMap, onAdd, onShow }: Props) {
   const { t } = useTranslation();
   const { state } = siteMap;
   const site = flow.meta.site;
@@ -95,14 +126,27 @@ export function SiteMap({ flow, siteMissing, onLocateSite, siteMap }: Props) {
       {state.error && <ErrorBanner error={state.error} onDismiss={siteMap.dismissError} />}
 
       <ul className="site-map__list">
-        <li className="site-map__row">
-          <span className="site-map__oval site-map__oval--start" />
-          {t("canvas.start")}
-        </li>
-        <li className="site-map__row">
-          <span className="site-map__oval" />
-          {t("canvas.end")}
-        </li>
+        {(["start", "end"] as const).map((kind) => {
+          const existing = flow.nodes.find((n) => n.kind === kind);
+          return (
+            <li key={kind}>
+              <button
+                type="button"
+                className="site-map__row site-map__row--toggle site-map__row--source"
+                draggable={!existing}
+                onDragStart={dragSource({ kind })}
+                onClick={() => (existing ? onShow(existing.id) : onAdd({ kind }))}
+                title={existing ? t("siteMap.showOnCanvas") : t("siteMap.addHint")}
+              >
+                <span
+                  className={`site-map__oval${kind === "start" ? " site-map__oval--start" : ""}`}
+                />
+                {kind === "start" ? t("canvas.start") : t("canvas.end")}
+                {existing && <span className="site-map__used" />}
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       <h3 className="site-map__section">{t("siteMap.pages")}</h3>
@@ -124,6 +168,9 @@ export function SiteMap({ flow, siteMissing, onLocateSite, siteMap }: Props) {
               </button>
               {open && (
                 <PageBlocks
+                  flow={flow}
+                  onAdd={onAdd}
+                  onShow={onShow}
                   page={read}
                   loading={state.running}
                   openBlocks={openBlocks}
@@ -144,6 +191,9 @@ export function SiteMap({ flow, siteMissing, onLocateSite, siteMap }: Props) {
 }
 
 type PageBlocksProps = {
+  flow: Flow;
+  onAdd: (source: NodeSource) => void;
+  onShow: (nodeId: string) => void;
   pageId: string;
   page: PageMap | null;
   loading: boolean;
@@ -151,7 +201,8 @@ type PageBlocksProps = {
   onToggle: (key: string) => void;
 };
 
-function PageBlocks({ pageId, page, loading, openBlocks, onToggle }: PageBlocksProps) {
+function PageBlocks(props: PageBlocksProps) {
+  const { flow, onAdd, onShow, pageId, page, loading, openBlocks, onToggle } = props;
   const { t } = useTranslation();
   if (!page) {
     return (
@@ -169,6 +220,10 @@ function PageBlocks({ pageId, page, loading, openBlocks, onToggle }: PageBlocksP
           <BlockRow
             key={key}
             block={block}
+            used={usedNode(flow, pageId, block)}
+            source={{ kind: "block", page: pageId, name: block.name, locators: block.locators }}
+            onAdd={onAdd}
+            onShow={onShow}
             open={openBlocks.has(key)}
             onToggle={() => onToggle(key)}
           />
@@ -178,38 +233,63 @@ function PageBlocks({ pageId, page, loading, openBlocks, onToggle }: PageBlocksP
   );
 }
 
-function BlockRow({
-  block,
-  open,
-  onToggle,
-}: {
+type BlockRowProps = {
   block: SiteBlock;
+  /** Scenario node of this block, if it is on the canvas. */
+  used: string | null;
+  source: NodeSource;
+  onAdd: (source: NodeSource) => void;
+  onShow: (nodeId: string) => void;
   open: boolean;
   onToggle: () => void;
-}) {
+};
+
+function BlockRow({ block, used, source, onAdd, onShow, open, onToggle }: BlockRowProps) {
   const { t } = useTranslation();
   const missing = block.status !== "found";
   const hasElements = block.elements.length > 0;
+  // A block the scenario names but this device lacks can't be added again.
+  const addable = !missing && block.locators.length > 0;
   const title = missing
     ? t("siteMap.blockMissing", { tried: block.tried.join("; ") })
-    : block.node
+    : used
       ? t("siteMap.inScenario")
-      : undefined;
+      : t("siteMap.addHint");
 
   return (
     <li role="treeitem" aria-expanded={hasElements ? open : undefined}>
-      <button
-        type="button"
-        className={`site-map__row site-map__row--toggle${missing ? " site-map__row--missing" : ""}`}
-        onClick={onToggle}
-        disabled={!hasElements}
-        title={title}
-      >
-        {hasElements ? <ChevronIcon open={open} /> : <span className="site-map__chevron-space" />}
-        {missing ? <WarningIcon size={14} /> : <KindIcon kind="block" />}
-        <span className="site-map__name">{block.name}</span>
-        {block.node && !missing && <span className="site-map__used" />}
-      </button>
+      <div className="site-map__line">
+        {hasElements ? (
+          <button
+            type="button"
+            className="site-map__chevron-button"
+            onClick={onToggle}
+            aria-label={open ? t("siteMap.collapse") : t("siteMap.expand")}
+          >
+            <ChevronIcon open={open} />
+          </button>
+        ) : (
+          <span className="site-map__chevron-space" />
+        )}
+        <button
+          type="button"
+          className={`site-map__row site-map__row--toggle site-map__row--source${
+            missing ? " site-map__row--missing" : ""
+          }`}
+          draggable={addable}
+          onDragStart={dragSource(source)}
+          onClick={() => {
+            if (used) onShow(used);
+            else if (addable) onAdd(source);
+          }}
+          disabled={!used && !addable}
+          title={title}
+        >
+          {missing ? <WarningIcon size={14} /> : <KindIcon kind="block" />}
+          <span className="site-map__name">{block.name}</span>
+          {used && !missing && <span className="site-map__used" />}
+        </button>
+      </div>
       {open && hasElements && (
         <ul className="site-map__list site-map__list--nested" role="group">
           {block.elements.map((element, i) => (

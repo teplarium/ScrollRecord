@@ -97,14 +97,16 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `app/App.tsx`, `app/AppFooter.tsx` | Window layout (tabs / screen / footer), restores last session's tabs; footer with versions and the language picker |
 | `app/TabBar.tsx`, `app/tabs.ts` | Project tabs (Home, one per project, "+"); tab rules as a tested reducer (`tabs.test.ts`) |
 | `features/projects/StartScreen.tsx`, `NewProjectForm.tsx`, `RecentList.tsx` | Home tab: new project form, open project ("Open anyway" on SR-1005), recent list |
-| `features/editor/Editor.tsx` | Project tab (D-38): assembles site map · canvas · right panel; holds the shown device and the selected shape; "Locate site folder…" |
+| `features/editor/Editor.tsx`, `shortcuts.ts` | Project tab (D-38): assembles site map · canvas · right panel from the tab's project store; Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y / Ctrl+S by key position (any keyboard layout); save status; "Locate site folder…" |
 | `features/editor/TopActions.tsx`, `PropertiesPanel.tsx` | Right panel: device switcher + preview/render/queue (disabled until 3.7/3.8); selected shape (settings in 3.5) |
-| `features/canvas/Canvas.tsx`, `nodes.tsx` | React Flow canvas (read-only until 3.4): pan/zoom/minimap, Start/End, block card, Navigate shapes |
-| `features/canvas/toReactFlow.ts`, `autoLayout.ts`, `cardSize.ts`, `layout.ts` | Scenario → shapes and arrows; own auto-layout (FR-CNV-12); card = device shape ≤ 800 px (D-39); `layout.json` format v1 (tests: `canvas.test.ts`) |
+| `features/canvas/Canvas.tsx`, `nodes.tsx` | React Flow canvas: pan/zoom/minimap; move shapes, pull arrows from a side handle (or drop on a shape), Delete, drop rows from the site map, clicked rows placed in a free spot; every change = one store edit |
+| `features/canvas/toReactFlow.ts`, `autoLayout.ts`, `cardSize.ts`, `separate.ts` | Scenario → shapes and arrows (arrow sides face each other); own auto-layout (FR-CNV-12); card = device shape ≤ 800 px (D-39); overlapping shapes pushed apart for display only (positions shared by devices) and `freeSpot` (tests: `canvas.test.ts`) |
 | `features/site-map/SiteMap.tsx`, `icons.tsx` | Left panel: site, Start/End, tree page → blocks → elements (list mode), progress + Cancel, "Read the site again", "Clear cached site data" |
 | `features/site-map/useSiteMap.ts`, `siteMapState.ts` | Runs the site map job per device (cancels outdated runs); job events → state as a tested reducer (`siteMapState.test.ts`) |
 | `features/settings/LanguageSelect.tsx` | UI language picker |
 | `features/README.md` | Planned feature folders and the "no cross-feature imports" rule |
+| `shared/store/projectStore.ts` | **One store per open project tab** (Zustand, registry by folder): document + undo history, view (device, selection), autosave queue; `closeProjectStore` / `saveAllProjects` before a tab / the window closes |
+| `shared/store/history.ts`, `edits.ts`, `layout.ts` | Undo history (200 steps, merge by key); every scenario edit as a pure function (add, move, connect, remove, set site; drag data from the site map); `layout.json` format v1 (tests: `store.test.ts`, `projectStore.test.ts`) |
 | `shared/ipc/commands.ts` | **Typed wrappers for every IPC command** (returns `IpcResult<T>`) |
 | `shared/ipc/dialogs.ts` | Native pickers (`tauri-plugin-dialog`); `null` outside the app. Site and project folders are picked through a file in them (`index.html`, `project.json`): Windows folder windows hide files and look empty |
 | `shared/ipc/errors.ts`, `useAppInfo.ts` | Error normalisation; `AppInfo` hook |
@@ -176,7 +178,7 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `project_home` | `src-tauri/src/commands/project.rs` | `commands.projectHome()` | `ProjectHome` | `App` (restore tabs), `StartScreen` |
 | `create_project` | `src-tauri/src/commands/project.rs` | `commands.createProject(request)` | `OpenedProject` | `NewProjectForm` |
 | `open_project` | `src-tauri/src/commands/project.rs` | `commands.openProject(dir, force)` | `OpenedProject` | `App`, `StartScreen` |
-| `save_project` | `src-tauri/src/commands/project.rs` | `commands.saveProject(dir, flow, layout)` | `null` | `Editor` ("Locate site folder…"; later: 3.4 autosave) |
+| `save_project` | `src-tauri/src/commands/project.rs` | `commands.saveProject(dir, flow, layout)` | `null` | `shared/store/projectStore.ts` (autosave ~1 s after an edit, Ctrl+S, tab close, window close) |
 | `close_project` | `src-tauri/src/commands/project.rs` | `commands.closeProject(dir)` | `null` | `App` (tab close) |
 | `forget_recent` | `src-tauri/src/commands/project.rs` | `commands.forgetRecent(dir)` | `null` | `StartScreen` (recent list, missing projects only) |
 | `trash_project` | `src-tauri/src/commands/project.rs` | `commands.trashProject(dir)` | `null` | `StartScreen` (recent list trash can; closed projects only) |
@@ -229,7 +231,10 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | Window doesn't open on Linux | Install `libwebkit2gtk-4.1-0` |
 | Site map is empty / spins / shows an error | Error text in the panel (SR-3001 = no Chrome, SR-80xx = site); `useSiteMap.ts` (job start/cancel), `src-tauri/src/jobs.rs`, `commands/site_map.rs`; stale results: `sr-analyzer/src/cache.rs` (fingerprint) — "Read the site again" skips the cache |
 | Site map misses a block or a button, or suggests a locator that fails when recording | `sr-analyzer/js/sitemap.js` (`INTERACTIVE`, `kindOf`, `candidates` — every candidate is checked with `__sr.locate.findAll` + the `within` rule of `__sr.measure`); test `every_suggested_locator_finds_exactly_its_element_when_recording` |
-| Canvas: shapes overlap / in odd places, or a scenario opens empty | `features/canvas/layout.ts` (`readLayout`: broken `layout.json` → auto-layout) and `autoLayout.ts`; tests `canvas.test.ts` |
+| Canvas: shapes overlap / in odd places, or a scenario opens empty | `shared/store/layout.ts` (`readLayout`: broken `layout.json` → auto-layout), `features/canvas/autoLayout.ts`, `separate.ts`; tests `canvas.test.ts` |
+| Edits are lost, not saved, or "Not saved" shows | `shared/store/projectStore.ts` (`saveNow` queue, `closeProjectStore`, `saveAllProjects`); window close: `app/App.tsx` (`onCloseRequested`, needs `core:window:allow-destroy`); Rust side `save_project`; tests `projectStore.test.ts` |
+| Undo / redo / Ctrl+S do nothing, or undo restores the wrong thing | `features/editor/shortcuts.ts` (key position, not character), `shared/store/history.ts`, `edits.ts`; tests `shortcuts.test.ts`, `store.test.ts` |
+| Rows can't be dragged onto the canvas | `tauri.conf.json` window `dragDropEnabled: false` (else Windows takes the drag for files); `NODE_SOURCE_MIME` in `shared/store/edits.ts`; `Canvas.tsx` `onDrop` |
 | Canvas: block cards have the wrong shape for a device | `features/canvas/cardSize.ts` (`screenOf`, `cardSize`); `device_presets` → `Viewport::presets()` in `sr-core/src/flow/target.rs` |
 
 ---
@@ -275,6 +280,7 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-28 | Step 3.0: ADR 0006 (editor architecture, accepted with the owner's answers); Phase 3 steps re-split in `docs/phase-3-plan.md`. No code changes |
 | 2026-10-29 | Editor layout from the owner (HANDOFF D-38, D-39): project tabs, left "Site map" panel, canvas with the scenario only, right properties panel; no page boards / inspector mode. ADR 0006 "Update 2026-10-29", Phase 3 steps re-split. No code changes |
 | 2026-10-29 | Step 3.1a: new crate `sr-project`; scenario types (`sr-core::flow`) exported to TypeScript (`Node` is `FlowNode` there); project IPC commands + `commands.ts` wrappers; `AppState` holds the `ProjectStore`; codes SR-1003…1006 |
+| 2026-10-30 | Step 3.4a: `zustand` 5.0.15; `shared/store/` (`projectStore`, `history`, `edits`, `layout.ts` moved from `features/canvas`); `features/canvas/separate.ts`; `features/editor/shortcuts.ts`; window `dragDropEnabled: false`, capability `core:window:allow-destroy` |
 | 2026-10-30 | Step 3.3b: `src-tauri/src/jobs.rs` (first long job), `commands/site_map.rs` (`start_site_map`, `cancel_job`, `clear_cache`); `sr-analyzer/src/cache.rs`; `features/site-map/{useSiteMap,siteMapState,icons}` |
 | 2026-10-30 | Step 3.3a: new crate `sr-analyzer` (site map: `analyze`, `SiteMap` types, `js/sitemap.js`); `runtime.js` exposes `__sr.locate` (locator engine, read-only); SR-0004 Cancelled |
 | 2026-10-30 | Step 3.2 follow-up: `trash` crate in `sr-project` (`ProjectStore::move_to_trash` / `remove_with`), command `trash_project`, SR-1007; site/project picked through a file (`shared/ipc/dialogs.ts`) |

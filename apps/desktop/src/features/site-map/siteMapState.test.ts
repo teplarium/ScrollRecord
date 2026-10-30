@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { AppError } from "../../shared/ipc/generated/AppError";
+import type { Flow } from "../../shared/ipc/generated/Flow";
+import type { FlowNode } from "../../shared/ipc/generated/FlowNode";
 import type { SiteMap } from "../../shared/ipc/generated/SiteMap";
 import { initialSiteMap, siteMapReducer, type SiteMapState } from "./siteMapState";
+import { siteMapKey } from "./useSiteMap";
 
 const map = (target: string) => ({ target, pages: [] }) as unknown as SiteMap;
 const error = (code: string) => ({ code, message: "", params: {} }) as AppError;
@@ -60,5 +63,21 @@ describe("site map state", () => {
     );
     expect(cancelled.error).toBeNull();
     expect(siteMapReducer(failed, { type: "dismissError" }).error).toBeNull();
+  });
+});
+
+describe("site map key", () => {
+  it("changes with blocks and pages, not with arrows or other shapes", () => {
+    const base = { meta: { name: "p" }, pages: [], prepare: {}, targets: [] };
+    const block = (id: string) =>
+      ({ kind: "block", id, page: "home", target: [{ sr: id }] }) as FlowNode;
+    const start = { kind: "start", id: "start" } as FlowNode;
+    const end = { kind: "end", id: "end" } as FlowNode;
+    const chain = (...ids: string[]) => ids.slice(1).map((to, i) => ({ from: ids[i], to }));
+    const make = (nodes: FlowNode[], edges: unknown[]) =>
+      ({ ...base, nodes, edges }) as unknown as Flow;
+    const key = siteMapKey(make([block("a")], []));
+    expect(siteMapKey(make([block("a"), start, end], chain("start", "a", "end")))).toBe(key);
+    expect(siteMapKey(make([block("a"), block("b")], []))).not.toBe(key);
   });
 });

@@ -5,12 +5,17 @@
  *
  * This file assembles the panels: features don't import each other, so the
  * screen that holds them passes data and callbacks between them (like
- * `App.tsx` does for tabs). View state that is never saved — the shown device
- * and the selected shape — lives here until the per-tab stores of step 3.4.
+ * `App.tsx` does for tabs). The tab's state — scenario, undo history, shown
+ * device, selection, saving — lives in its project store (`shared/store`),
+ * which outlives this component when another tab is shown.
+ *
+ * Keys (only in this tab, not while typing in a field; `shortcuts.ts`):
+ * Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo, Ctrl+S save now. Delete is
+ * handled by the canvas.
  *
  * "Locate site folder…" (moved site, `siteMissing`): the user picks the site's
- * start page, Rust turns its folder into a portable path (`portableSite`), it
- * goes into the scenario and is saved. From step 3.4 this becomes one undoable edit in the store.
+ * start page, Rust turns its folder into a portable path (`portableSite`) and
+ * it becomes an ordinary, undoable edit of `meta.site`.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,19 +25,20 @@ import { pickSiteFolder } from "../../shared/ipc/dialogs";
 import type { AppError } from "../../shared/ipc/generated/AppError";
 import type { DevicePreset } from "../../shared/ipc/generated/DevicePreset";
 import type { OpenedProject } from "../../shared/ipc/generated/OpenedProject";
+import { setSite } from "../../shared/store/edits";
+import { projectStore, useProject } from "../../shared/store/projectStore";
 import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import { Canvas } from "../canvas/Canvas";
 import { screenOf } from "../canvas/cardSize";
 import { SiteMap } from "../site-map/SiteMap";
 import { useSiteMap } from "../site-map/useSiteMap";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { editorShortcut } from "./shortcuts";
 import { TopActions } from "./TopActions";
 import "./Editor.css";
 
 type Props = {
   project: OpenedProject;
-  /** The project's data changed (site located and saved). */
-  onChange: (project: OpenedProject) => void;
 };
 
 // Device sizes never change while the app runs: ask Rust once for all tabs.
@@ -43,12 +49,15 @@ function loadPresets() {
   return presetsRequest;
 }
 
-export function Editor({ project, onChange }: Props) {
+export function Editor({ project }: Props) {
   const { t } = useTranslation();
-  const { flow } = project;
+  const store = projectStore(project);
+  const { flow } = useProject(store, (s) => s.history.present);
+  const targetId = useProject(store, (s) => s.targetId);
+  const selectedId = useProject(store, (s) => s.selectedId);
+  const siteMissing = useProject(store, (s) => s.siteMissing);
+  const save = useProject(store, (s) => s.save);
   const [presets, setPresets] = useState<DevicePreset[]>([]);
-  const [targetId, setTargetId] = useState<string | null>(flow.targets[0]?.id ?? null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<AppError | null>(null);
 
   useEffect(() => {
@@ -61,11 +70,26 @@ export function Editor({ project, onChange }: Props) {
     };
   }, []);
 
+  // ── Keyboard: undo / redo / save in this tab ──
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const shortcut = editorShortcut(event);
+      if (!shortcut) return;
+      event.preventDefault();
+      const state = store.getState();
+      if (shortcut === "undo") state.undo();
+      else if (shortcut === "redo") state.redo();
+      else void state.saveNow();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [store]);
+
   const target = flow.targets.find((tg) => tg.id === targetId) ?? flow.targets[0];
   const screen = useMemo(() => screenOf(target?.viewport, presets), [target, presets]);
   const selected = flow.nodes.find((n) => n.id === selectedId) ?? null;
   // The site map of the shown device; not read while the site folder is missing.
-  const siteMap = useSiteMap(project.dir, flow, project.siteMissing ? null : (target?.id ?? null));
+  const siteMap = useSiteMap(project.dir, flow, siteMissing ? null : (target?.id ?? null));
 
   async function locateSite() {
     const picked = await pickSiteFolder(t("siteMap.locateTitle"), {
@@ -76,30 +100,40 @@ export function Editor({ project, onChange }: Props) {
     setError(null);
     const site = await commands.portableSite(project.dir, picked);
     if (!site.ok) return setError(site.error);
-    const changed = { ...flow, meta: { ...flow.meta, site: site.value } };
-    const saved = await commands.saveProject(project.dir, changed, project.layout);
-    if (!saved.ok) return setError(saved.error);
-    onChange({ ...project, flow: changed, siteMissing: false });
+    store.getState().edit((doc) => setSite(doc, site.value));
+    store.getState().siteLocated();
   }
 
   return (
     <main className="editor">
       <SiteMap
         flow={flow}
-        siteMissing={project.siteMissing}
+        siteMissing={siteMissing}
         onLocateSite={() => void locateSite()}
         siteMap={siteMap}
+        onAdd={(source) => store.getState().requestAdd(source)}
+        onShow={(id) => store.getState().focusNode(id)}
       />
       <section className="editor__canvas" aria-label={t("canvas.title")}>
-        {error && (
+        {(error ?? save.error) && (
           <div className="editor__error">
-            <ErrorBanner error={error} onDismiss={() => setError(null)} />
+            {error && <ErrorBanner error={error} onDismiss={() => setError(null)} />}
+            {save.error && (
+              <ErrorBanner error={save.error} onDismiss={store.getState().dismissSaveError} />
+            )}
           </div>
         )}
-        <Canvas flow={flow} layout={project.layout} screen={screen} onSelect={setSelectedId} />
+        <Canvas store={store} screen={screen} />
+        <span className={`editor__save editor__save--${save.status}`} role="status">
+          {t(`save.${save.status}`)}
+        </span>
       </section>
       <aside className="editor__right" aria-label={t("inspector.title")}>
-        <TopActions targets={flow.targets} current={target?.id ?? null} onDevice={setTargetId} />
+        <TopActions
+          targets={flow.targets}
+          current={target?.id ?? null}
+          onDevice={(id) => store.getState().setView({ targetId: id })}
+        />
         <PropertiesPanel node={selected} />
       </aside>
     </main>

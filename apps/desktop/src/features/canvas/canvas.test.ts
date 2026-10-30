@@ -5,8 +5,9 @@ import type { Flow } from "../../shared/ipc/generated/Flow";
 import type { FlowNode } from "../../shared/ipc/generated/FlowNode";
 import { autoLayout, ROW_GAP } from "./autoLayout";
 import { cardSize, screenOf, shapeSize, TERMINAL_SIZE } from "./cardSize";
-import { emptyLayout, readLayout } from "./layout";
-import { buildCanvas, openingShapes } from "./toReactFlow";
+import { emptyLayout, readLayout } from "../../shared/store/layout";
+import { freeSpot, MIN_GAP, separate } from "./separate";
+import { buildCanvas, edgeIndex, openingShapes } from "./toReactFlow";
 
 // ── Small scenario builders (only the fields the canvas reads) ──
 
@@ -185,5 +186,80 @@ describe("openingShapes", () => {
 
     const short = flow([start, block("a"), end], chain("start", "a", "end"));
     expect(openingShapes(buildCanvas(short, emptyLayout, card).nodes)).toHaveLength(3);
+  });
+});
+
+describe("separate (positions shared by devices, ADR 0006)", () => {
+  const phone = cardSize({ width: 390, height: 844 });
+  const desktop = cardSize({ width: 1920, height: 1080 });
+
+  it("pushes a column laid out for desktop apart on a phone, and keeps x", () => {
+    const ids = ["a", "b", "c", "d"];
+    const saved = autoLayout(
+      ids.map((id) => block(id)),
+      chain(...ids),
+      () => desktop,
+    );
+    const boxes = ids.map((id) => ({ id, position: saved[id]!, ...phone }));
+    const moved = separate(boxes);
+    const shown = boxes.map((b) => ({ ...b, position: moved.get(b.id) ?? b.position }));
+    for (let i = 1; i < shown.length; i++) {
+      const above = shown[i - 1]!;
+      expect(shown[i]!.position.y).toBeGreaterThanOrEqual(
+        above.position.y + phone.height + MIN_GAP,
+      );
+      expect(shown[i]!.position.x).toBe(saved[ids[i]!]!.x);
+    }
+    expect(moved.has("a")).toBe(false); // the top shape stays where it was saved
+  });
+
+  it("leaves shapes that don't overlap alone", () => {
+    const boxes = [
+      { id: "a", position: { x: 0, y: 0 }, ...desktop },
+      { id: "b", position: { x: 0, y: desktop.height + ROW_GAP }, ...desktop },
+      { id: "c", position: { x: desktop.width + 10, y: 0 }, ...desktop },
+    ];
+    expect(separate(boxes).size).toBe(0);
+  });
+
+  it("separates 250 stacked shapes quickly (NFR-05)", () => {
+    const boxes = Array.from({ length: 250 }, (_, i) => ({
+      id: `b${i}`,
+      position: { x: 0, y: i },
+      ...phone,
+    }));
+    const began = performance.now();
+    const moved = separate(boxes);
+    expect(performance.now() - began).toBeLessThan(200);
+    expect(moved.get("b249")!.y).toBe(249 * (phone.height + MIN_GAP));
+  });
+});
+
+describe("freeSpot (shapes clicked in from the site map)", () => {
+  it("goes below the shapes in the way and keeps x", () => {
+    const boxes = [
+      { id: "start", position: { x: 0, y: 0 }, ...TERMINAL_SIZE },
+      { id: "hero", position: { x: -200, y: 200 }, ...card },
+    ];
+    const spot = freeSpot(boxes, { x: 0, y: 10 }, TERMINAL_SIZE);
+    expect(spot).toEqual({ x: 0, y: 200 + card.height + MIN_GAP });
+    expect(freeSpot(boxes, { x: 5000, y: 0 }, TERMINAL_SIZE)).toEqual({ x: 5000, y: 0 });
+  });
+});
+
+describe("arrows on the canvas", () => {
+  it("leave and enter on the sides that face each other", () => {
+    const nodes = [block("a"), block("b"), block("c")];
+    const layout = {
+      ...emptyLayout,
+      nodes: { a: { x: 0, y: 0 }, b: { x: 0, y: 2000 }, c: { x: 3000, y: 2000 } },
+    };
+    const { edges } = buildCanvas(flow(nodes, chain("a", "b", "c")), layout, card);
+    expect(edges.map((e) => [e.sourceHandle, e.targetHandle])).toEqual([
+      ["bottom", "top-in"],
+      ["right", "left-in"],
+    ]);
+    expect(edges.map((e) => edgeIndex(e.id))).toEqual([0, 1]);
+    expect(edgeIndex("x")).toBeNull();
   });
 });

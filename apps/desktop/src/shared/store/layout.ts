@@ -1,9 +1,10 @@
 /**
- * Canvas layout — the editor-only part of a project, stored in `layout.json`.
+ * Canvas layout — the editor-only part of a project, stored in `layout.json`
+ * (part of the project document in the store; drawn by `features/canvas`).
  *
  * Why separate from the scenario: positions are noise for the renderer and for
  * AI skills reading the scenario (ADR 0006 §1). Rust treats this file as free
- * JSON, so the canvas owns its format and must survive anything in it: a
+ * JSON, so the UI owns its format and must survive anything in it: a
  * hand-edited, older or broken file reads as "no positions" (auto-layout,
  * FR-CNV-12) instead of breaking the editor.
  *

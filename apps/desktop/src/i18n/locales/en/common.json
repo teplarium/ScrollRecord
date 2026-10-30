@@ -92,7 +92,7 @@
     "loading": "Reading…",
     "notRead": "Not read yet.",
     "noBlocks": "No blocks found. Mark sections of the site with data-sr=\"name\" to see them here.",
-    "inScenario": "Used in the scenario",
+    "inScenario": "Used in the scenario — click to show it on the canvas",
     "blockMissing": "The scenario uses this block, but it wasn't found on this device. Tried: {{tried}}",
     "noLocator": "No reliable way to find this element yet (it has no unique name or text in its block).",
     "elementTitle": "{{kind}}: {{label}}",
@@ -109,7 +109,11 @@
       "slider": "Slider",
       "draggable": "Draggable",
       "other": "Element"
-    }
+    },
+    "addHint": "Click to add it to the middle of the canvas, or drag it to a place",
+    "showOnCanvas": "Already on the canvas — click to show it",
+    "expand": "Show its elements",
+    "collapse": "Hide its elements"
   },
   "canvas": {
     "title": "Scenario canvas",
@@ -121,7 +125,7 @@
     "actions_other": "{{count}} cursor actions",
     "navigate": "Navigation",
     "navigateTo": "→ {{page}}",
-    "empty": "The scenario is empty. Shapes will be added from the site map (coming in step 3.4).",
+    "empty": "The scenario is empty. Drag Start, the blocks you need and End here from the site map, then pull arrows between them from the shapes' edges.",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "fitView": "Show the whole scenario",
@@ -178,5 +182,11 @@
     "SR-8001": "No site was chosen. Pick a site folder or a localhost address.",
     "SR-8002": "The site folder wasn't found, or it has no index.html.",
     "SR-8003": "The built-in local web server couldn't start."
+  },
+  "save": {
+    "saved": "Saved",
+    "pending": "Not saved yet",
+    "saving": "Saving…",
+    "failed": "Not saved"
   }
 }

@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.4a — building the scenario with the mouse
+- Put Start, End and blocks on the canvas from the site map: drag a row to the place you want, or click it — it appears in a free spot in the middle of the view. Clicking a row that is already on the canvas (red dot) shows it there; drag a block again to use it a second time.
+- Pull an arrow out of a shape: hover it, grab one of the round handles on its sides and drop it on another shape (anywhere on it). A shape has one arrow out and one in, so a new arrow replaces the old one. The first arrow from Start to a block also tells Start where the video begins.
+- Move shapes by dragging; Delete (or Backspace) removes the selected shapes or arrows.
+- Ctrl+Z undoes, Ctrl+Shift+Z or Ctrl+Y redoes (up to 200 steps per project tab, kept while you switch tabs). The shortcuts work with any keyboard layout, Russian included.
+- Everything is saved by itself about a second after a change, and before a tab or the window closes; Ctrl+S saves at once. The canvas corner says "Saved", "Saving…" or "Not saved". If saving fails, the error is shown and the tab stays open; closing the window a second time quits anyway.
+- Positions are shared by all devices. On a device with taller cards (a phone) shapes that would overlap are shown moved down; nothing moves in the file until you drag a shape yourself.
+- The site map is not read again after every change: only when the site, pages or the scenario's blocks change (moves and arrows don't count).
+
 ### Editor, step 3.3 — the site map lists the site's blocks and buttons
 - The "Site map" panel now shows each page's blocks (marked with `data-sr`, plus those the scenario uses) and, when you open a block, its buttons, links, fields and other things the cursor can use — each with a small icon, like layers in Figma. A red dot means the block is already in the scenario; a warning means the scenario uses a block this device doesn't have.
 - The site is read automatically when a project opens and when you switch the device (the map can differ: a phone shows "Open menu" instead of the menu links). While it reads, a progress line with "Cancel" is shown.

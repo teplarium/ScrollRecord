@@ -41,7 +41,12 @@ export function cardSize(screen: Size | null): Size {
 
 /** Size of any shape on the canvas. */
 export function shapeSize(node: FlowNode, card: Size): Size {
-  switch (node.kind) {
+  return sourceSize(node.kind, card);
+}
+
+/** Size of a shape of `kind` (a node not created yet, e.g. dropped from the site map). */
+export function sourceSize(kind: FlowNode["kind"], card: Size): Size {
+  switch (kind) {
     case "block":
       return card;
     case "navigate":

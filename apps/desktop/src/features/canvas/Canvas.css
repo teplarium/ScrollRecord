@@ -164,3 +164,38 @@
 .canvas-minimap--navigate {
   fill: var(--text-muted);
 }
+
+/* ── Handles and arrows (editing) ──
+   Handles keep about 18 px on screen at any zoom (`--canvas-zoom` is set by
+   Canvas.tsx): the canvas is usually zoomed out to 20–40 %, where a fixed
+   size would shrink to a few pixels. They appear on hover and on the
+   selected shape so they don't clutter the cards.
+   The "in" handles sit under the "out" ones and are never seen: arrows are
+   dropped on them (or anywhere on a shape, see Canvas.tsx). */
+
+.canvas .react-flow__handle {
+  width: calc(18px / var(--canvas-zoom, 1));
+  height: calc(18px / var(--canvas-zoom, 1));
+  border-width: calc(3px / var(--canvas-zoom, 1));
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.canvas .react-flow__node:hover .react-flow__handle,
+.canvas .react-flow__node.selected .react-flow__handle,
+.canvas--connecting .react-flow__handle {
+  opacity: 1;
+}
+
+.canvas .react-flow__handle:hover {
+  background: var(--accent);
+}
+
+.canvas .react-flow__handle.canvas-handle--in {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.canvas .react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--focus);
+}

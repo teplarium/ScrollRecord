@@ -14,7 +14,7 @@
 import type { Edge } from "../../shared/ipc/generated/Edge";
 import type { FlowNode } from "../../shared/ipc/generated/FlowNode";
 import type { Size } from "./cardSize";
-import type { Point } from "./layout";
+import type { Point } from "../../shared/store/layout";
 
 /** Vertical space between shapes (room for the arrow). */
 export const ROW_GAP = 80;
