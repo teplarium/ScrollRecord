@@ -1,0 +1,166 @@
+/* Canvas and its shapes.
+   Why big type: block cards are up to 800 px wide (D-39), so a whole scenario
+   is usually seen zoomed out to 15–30 %; names must stay readable there.
+   Colours come from the app tokens (global.css), so light/dark follow the OS. */
+
+.canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.canvas .react-flow {
+  --xy-background-color: var(--bg);
+  --xy-background-pattern-color: var(--border-strong);
+  --xy-edge-stroke: var(--text-muted);
+  --xy-edge-stroke-width: 3;
+  --xy-handle-background-color: var(--border-strong);
+  --xy-handle-border-color: var(--surface);
+  --xy-minimap-background-color: var(--surface);
+  --xy-minimap-mask-background-color: rgb(0 0 0 / 35%);
+  --xy-minimap-node-background-color: var(--border-strong);
+  --xy-controls-button-background-color: var(--surface-raised);
+  --xy-controls-button-background-color-hover: var(--surface);
+  --xy-controls-button-color: var(--text);
+  --xy-controls-button-color-hover: var(--text);
+  --xy-controls-button-border-color: var(--border);
+  --xy-attribution-background-color: transparent;
+}
+
+.canvas .react-flow__minimap,
+.canvas .react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* Our shapes draw their own frame and selection. */
+.canvas .react-flow__node {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.canvas__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--text-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── Start / End ── */
+
+.canvas-terminal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.canvas-terminal--start {
+  border-color: var(--accent);
+}
+
+.canvas-terminal__name {
+  font-size: 40px;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.canvas-terminal__hold {
+  color: var(--text-muted);
+  font-size: 22px;
+}
+
+/* ── Block card ── */
+
+.canvas-block {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.canvas-block__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.canvas-block__name {
+  overflow: hidden;
+  font-size: 36px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-block__hold {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 26px;
+}
+
+/* Empty until the block pictures arrive (step 3.6). */
+.canvas-block__picture {
+  flex: 1;
+  background: repeating-linear-gradient(135deg, transparent 0 24px, var(--border) 24px 26px);
+  opacity: 0.6;
+}
+
+.canvas-block__footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 24px;
+}
+
+/* ── Navigate (drawn only; navigation itself is Phase 4) ── */
+
+.canvas-navigate {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 3px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  font-size: 30px;
+}
+
+/* ── Selection ── */
+
+.canvas .react-flow__node.selected > * {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+/* ── Minimap colours by shape ── */
+
+.canvas-minimap--terminal {
+  fill: var(--accent);
+}
+
+.canvas-minimap--navigate {
+  fill: var(--text-muted);
+}

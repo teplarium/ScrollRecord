@@ -7,7 +7,8 @@
  *   `untitledBase`, Rust finds the free number in the chosen folder);
  * - location is pre-filled: `Documents/ScrollRecord` the first time, then
  *   the last one used (Rust remembers it);
- * - the site is a folder (picked) or an `http(s)://` address (typed);
+ * - the site is a folder (picked through its `index.html`) or an `http(s)://`
+ *   address (typed);
  * - start from an empty canvas or from a scenario file (import).
  * A website is required, except when importing a scenario that names its
  * own site.
@@ -16,7 +17,7 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { commands } from "../../shared/ipc/commands";
-import { pickFolder, pickScenarioFile } from "../../shared/ipc/dialogs";
+import { pickFolder, pickScenarioFile, pickSiteFolder } from "../../shared/ipc/dialogs";
 import type { AppError } from "../../shared/ipc/generated/AppError";
 import type { NewProject } from "../../shared/ipc/generated/NewProject";
 import type { OpenedProject } from "../../shared/ipc/generated/OpenedProject";
@@ -80,15 +81,19 @@ export function NewProjectForm({ suggestedLocation, onCreated, onCancel }: Props
   }
 
   async function chooseSite() {
-    const dir = await pickFolder(t("newProject.pickSite"), siteFolder || undefined);
+    const dir = await pickSiteFolder(
+      t("newProject.pickSite"),
+      { files: t("dialogs.webPages"), all: t("dialogs.allFiles") },
+      siteFolder || undefined,
+    );
     if (dir) setSiteFolder(dir);
   }
 
   async function chooseImport() {
-    const file = await pickScenarioFile(
-      t("newProject.pickScenario"),
-      t("newProject.scenarioFilter"),
-    );
+    const file = await pickScenarioFile(t("newProject.pickScenario"), {
+      files: t("dialogs.scenarios"),
+      all: t("dialogs.allFiles"),
+    });
     if (file) setImportFile(file);
   }
 

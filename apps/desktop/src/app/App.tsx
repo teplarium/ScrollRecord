@@ -7,7 +7,7 @@
  */
 import { useEffect, useReducer, useState } from "react";
 
-import { EditorPlaceholder } from "../features/editor/EditorPlaceholder";
+import { Editor } from "../features/editor/Editor";
 import { openFailure, StartScreen, type OpenFailure } from "../features/projects/StartScreen";
 import { commands } from "../shared/ipc/commands";
 import type { OpenedProject } from "../shared/ipc/generated/OpenedProject";
@@ -81,7 +81,7 @@ export function App() {
         onNew={() => showHome(true)}
       />
       {shown ? (
-        <EditorPlaceholder
+        <Editor
           key={shown.dir}
           project={shown}
           onChange={(project) => dispatch({ type: "updated", project })}

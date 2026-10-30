@@ -1,0 +1,105 @@
+/* Left panel of the editor (site map). Rows are compact like Figma layers. */
+
+.site-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+  font-size: var(--text-sm);
+}
+
+.site-map__title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.site-map__site {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.site-map__label,
+.site-map__section {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.site-map__path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.site-map__warning {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  font-size: var(--text-xs);
+}
+
+.site-map__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-map__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.site-map__row:hover {
+  background: var(--surface-raised);
+}
+
+.site-map__oval {
+  flex: none;
+  width: 16px;
+  height: 9px;
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+}
+
+.site-map__oval--start {
+  border-color: var(--accent);
+}
+
+.site-map__page {
+  font-weight: 500;
+}
+
+.site-map__url {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-map__later {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

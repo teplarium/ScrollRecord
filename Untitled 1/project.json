@@ -1,0 +1,11 @@
+{
+  "project_format": 1,
+  "name": "Untitled 1",
+  "app_version": "0.1.0",
+  "created_ms": 1793369763877,
+  "modified_ms": 1793369763877,
+  "flow": "flow.srflow.json",
+  "render": {
+    "file_name": "{project}_{target}_{date}"
+  }
+}

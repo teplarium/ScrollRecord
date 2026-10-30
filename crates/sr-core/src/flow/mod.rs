@@ -28,7 +28,8 @@ pub use cursor::{CursorKind, CursorSettings, DEFAULT_CURSOR_PACK, ScrollCursor};
 pub use locator::Locator;
 pub use path::{FlowPlan, MeasureItem, PlanAction, PlanBlock, PlanEnd, PlanStart, ScrollMove};
 pub use target::{
-    Aspect, Fit, Frame, OutputFormat, OutputGeometry, Resolution, Target, Viewport, ViewportRef,
+    Aspect, DevicePreset, Fit, Frame, OutputFormat, OutputGeometry, Resolution, Target, Viewport,
+    ViewportRef,
 };
 
 use crate::easing::Easing;
@@ -549,6 +550,18 @@ mod tests {
             checked >= 6,
             "expected the examples folder, found {checked} files"
         );
+    }
+
+    #[test]
+    fn long_editor_test_scenario_stays_valid() {
+        // `tests/fixtures/flows/long-250.srflow.json` is opened in the editor
+        // to check that 250 shapes stay smooth (HANDOFF NFR-05); keep it
+        // valid when the format changes.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/flows/long-250.srflow.json");
+        let flow = Flow::from_json(&std::fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(flow.nodes.len(), 250);
+        flow.validate().unwrap();
     }
 
     #[test]

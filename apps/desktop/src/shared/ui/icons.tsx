@@ -60,3 +60,24 @@ export function WarningIcon({ size = 18 }: IconProps) {
     </svg>
   );
 }
+
+export function PlayIcon({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 5.5v13l10-6.5-10-6.5Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function QueueIcon({ size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 7h14M5 12h14M5 17h9"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

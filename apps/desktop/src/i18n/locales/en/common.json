@@ -15,7 +15,7 @@
     "openProjectHint": "Continue a project you saved before",
     "recent": "Recent projects",
     "recentEmpty": "No projects yet. They will show up here once you create one.",
-    "openDialogTitle": "Choose a project folder",
+    "openDialogTitle": "Open a project: choose its project.json",
     "openAnyway": "Open anyway"
   },
   "footer": {
@@ -28,6 +28,12 @@
   "common": {
     "dismiss": "Dismiss",
     "errorCode": "Error {{code}}"
+  },
+  "dialogs": {
+    "webPages": "Web pages",
+    "scenarios": "ScrollRecord scenarios",
+    "projects": "ScrollRecord projects (project.json)",
+    "allFiles": "All files"
   },
   "tabs": {
     "label": "Open projects",
@@ -52,35 +58,64 @@
     "siteFolder": "Folder",
     "siteUrl": "Address",
     "siteFolderPlaceholder": "No folder chosen",
-    "siteFolderHint": "The folder with the site's index.html.",
+    "siteFolderHint": "Choose the site's start page (index.html). Its folder becomes the website.",
     "siteUrlPlaceholder": "http://localhost:5173",
     "siteUrlHint": "Your running dev server, starting with http:// or https://.",
-    "pickSite": "Choose the site folder",
+    "pickSite": "Choose the site's start page (index.html)",
     "startWith": "Start with",
     "startEmpty": "Empty canvas",
     "startImport": "Scenario file",
     "importPlaceholder": "No file chosen",
     "importHint": "If you leave the website empty, the one named in the file is used.",
-    "pickScenario": "Choose a scenario file",
-    "scenarioFilter": "ScrollRecord scenario",
+    "pickScenario": "Choose a scenario file (*.srflow.json)",
     "cancel": "Cancel",
     "create": "Create project",
     "creating": "Creating…"
   },
-  "editor": {
-    "folder": "Project folder",
+  "siteMap": {
+    "title": "Site map",
     "site": "Website",
     "noSite": "No website set",
-    "videos": "Video formats",
-    "videosValue_one": "{{count}} format",
-    "videosValue_other": "{{count}} formats",
-    "nodes": "Scenario",
-    "nodesValue_one": "{{count}} shape",
-    "nodesValue_other": "{{count}} shapes",
-    "siteMissing": "The site folder wasn't found: {{site}}. It may have been moved or renamed.",
+    "siteMissing": "The site folder wasn't found. It may have been moved or renamed.",
     "locate": "Locate site folder…",
-    "locateTitle": "Choose the site folder",
-    "comingNext": "The canvas arrives in the next step (3.2)."
+    "locateTitle": "Choose the site's start page (index.html)",
+    "pages": "Pages",
+    "blocksLater": "Blocks and buttons of each page appear here in the next step."
+  },
+  "canvas": {
+    "title": "Scenario canvas",
+    "start": "Start",
+    "end": "End",
+    "hold": "{{seconds, number(maximumFractionDigits: 1)}} s",
+    "noStop": "No stop",
+    "actions_one": "{{count}} cursor action",
+    "actions_other": "{{count}} cursor actions",
+    "navigate": "Navigation",
+    "navigateTo": "→ {{page}}",
+    "empty": "The scenario is empty. Shapes will be added from the site map (coming in step 3.4).",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Show the whole scenario",
+    "minimap": "Mini map"
+  },
+  "inspector": {
+    "title": "Properties",
+    "nothingSelected": "Nothing selected. Click a shape on the canvas.",
+    "kindStart": "Start",
+    "kindEnd": "End",
+    "kindBlock": "Block",
+    "kindNavigate": "Navigation",
+    "later": "Its settings become editable in a later step."
+  },
+  "topActions": {
+    "device": "Device",
+    "target": "{{name}} · {{aspect}}",
+    "noTargets": "No video formats",
+    "preview": "Preview",
+    "render": "Render",
+    "queue": "Queue",
+    "later": "Coming in a later step",
+    "laterFor": "{{action}} — coming in a later step"
   },
   "errors": {
     "SR-0001": "Something unexpected went wrong inside ScrollRecord. This is a bug — please report it and mention {{code}}.",

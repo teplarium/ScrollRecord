@@ -18,6 +18,7 @@ import { invoke, isTauri, type InvokeArgs } from "@tauri-apps/api/core";
 import { appError, toAppError } from "./errors";
 import type { AppError } from "./generated/AppError";
 import type { AppInfo } from "./generated/AppInfo";
+import type { DevicePreset } from "./generated/DevicePreset";
 import type { Flow } from "./generated/Flow";
 import type { ImportedFlow } from "./generated/ImportedFlow";
 import type { NewProject } from "./generated/NewProject";
@@ -45,6 +46,8 @@ async function call<T>(command: string, args?: InvokeArgs): Promise<IpcResult<T>
 export const commands = {
   /** Versions and platform. Rust: `commands::app::app_info`. */
   appInfo: () => call<AppInfo>("app_info"),
+  /** Built-in devices and their screen sizes. Rust: `commands::app::device_presets`. */
+  devicePresets: () => call<DevicePreset[]>("device_presets"),
 
   // ── Projects (Rust: `commands::project`, logic in `crates/sr-project`) ──
   // A project is identified by its folder `dir`: several can be open as tabs.

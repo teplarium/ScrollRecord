@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { commands } from "../../shared/ipc/commands";
-import { pickFolder } from "../../shared/ipc/dialogs";
+import { pickProjectFolder } from "../../shared/ipc/dialogs";
 import type { AppError } from "../../shared/ipc/generated/AppError";
 import type { OpenedProject } from "../../shared/ipc/generated/OpenedProject";
 import type { ProjectHome } from "../../shared/ipc/generated/ProjectHome";
@@ -74,7 +74,11 @@ export function StartScreen({ startWithForm, notice, onNoticeDismiss, onOpened }
   }
 
   async function chooseAndOpen() {
-    const dir = await pickFolder(t("start.openDialogTitle"), home?.suggestedLocation);
+    const dir = await pickProjectFolder(
+      t("start.openDialogTitle"),
+      { files: t("dialogs.projects"), all: t("dialogs.allFiles") },
+      home?.suggestedLocation,
+    );
     if (dir) await open(dir);
   }
 

@@ -1,0 +1,95 @@
+/* Editor window layout (D-38): site map | canvas | properties.
+   Side panels have fixed widths for now; resizing and hiding come later. */
+
+.app > main.editor {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor__canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor__error {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  z-index: 10;
+  width: min(560px, 90%);
+  transform: translateX(-50%);
+}
+
+.editor__right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+}
+
+/* ── Top row: device, preview, render, queue ── */
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.top-actions__device {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-actions .button {
+  flex: none;
+  padding-inline: var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.top-actions .top-actions__icon {
+  display: grid;
+  place-items: center;
+  padding-inline: var(--space-2);
+}
+
+/* ── Properties ── */
+
+.properties {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.properties--empty,
+.properties__later {
+  color: var(--text-muted);
+}
+
+.properties__kind {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.properties__name {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.properties__later {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+}

@@ -211,6 +211,31 @@ impl Viewport {
     pub fn has_touch(&self) -> bool {
         self.touch.unwrap_or(self.mobile)
     }
+
+    /// Every built-in preset in [`Viewport::PRESET_NAMES`] order.
+    /// The editor needs the sizes to draw block cards in the device's shape
+    /// (HANDOFF D-39) without keeping its own copy of this table.
+    pub fn presets() -> Vec<DevicePreset> {
+        Self::PRESET_NAMES
+            .iter()
+            .filter_map(|name| {
+                Self::preset(name).map(|viewport| DevicePreset {
+                    name: (*name).to_owned(),
+                    viewport,
+                })
+            })
+            .collect()
+    }
+}
+
+/// A built-in device preset with its viewport, for the editor's device lists.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct DevicePreset {
+    /// Preset name as written in a scenario (`"iphone-15"`).
+    pub name: String,
+    /// Its viewport.
+    pub viewport: Viewport,
 }
 
 // ── Aspect ratio ────────────────────────────────────────────────────────────
@@ -406,6 +431,15 @@ mod tests {
         };
         let vp = t.viewport.resolve().unwrap();
         (t, vp)
+    }
+
+    #[test]
+    fn every_preset_name_has_a_viewport() {
+        let presets = Viewport::presets();
+        assert_eq!(presets.len(), Viewport::PRESET_NAMES.len());
+        let iphone = presets.iter().find(|p| p.name == "iphone-15").unwrap();
+        assert_eq!((iphone.viewport.width, iphone.viewport.height), (393, 852));
+        assert!(iphone.viewport.mobile);
     }
 
     #[test]

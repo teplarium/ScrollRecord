@@ -67,6 +67,7 @@ pub fn run() {
         // sync with `commands/mod.rs` and the "IPC map" in PROJECT_MAP.md.
         .invoke_handler(tauri::generate_handler![
             commands::app::app_info,
+            commands::app::device_presets,
             commands::project::project_home,
             commands::project::create_project,
             commands::project::open_project,

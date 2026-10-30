@@ -5,6 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.2 — the editor window and the scenario canvas
+- Choosing files is clearer: the website is chosen by picking its start page (`index.html`) and an existing project by picking its `project.json` — the windows show files instead of an empty-looking folder. Every file window also offers "All files".
+- A project tab is now the editor: "Site map" on the left (the website, Start, End and the site's pages; blocks and buttons arrive in the next step), the canvas in the middle, properties on the right.
+- The canvas shows the scenario: Start and End as ovals, each block as a card with its name and pause ("1.5 s", "No stop"), and the arrows between them. Move around with the mouse wheel or touchpad (or by dragging), zoom with Ctrl+wheel; small buttons zoom and "show the whole scenario", the mini map shows where you are. Editing on the canvas comes in step 3.4.
+- Block cards have the shape of the chosen device: wide on a desktop, tall on a phone (until the site is measured, a card is one screen of that device). The device is picked at the top of the right panel; the arrows stay the same. Preview, Render and Queue buttons are there but not active yet.
+- A scenario without saved positions (for example a file written by an AI) arranges itself: one column in the order of the arrows, branches to the right, unconnected shapes in their own column.
+- Clicking a shape shows its kind and name on the right (its settings become editable in step 3.5).
+- A project opens showing the beginning of its scenario at a readable size (a short scenario is shown whole); the "show the whole scenario" button fits everything.
+- For checking speed with long scenarios: `tests/fixtures/flows/long-250.srflow.json` (250 shapes).
+
 ### Editor, step 3.1b — project tabs and the start screen
 - Projects open as tabs at the top of the window, like files in Figma: a Home tab, one tab per project, and "+" for a new project. Closing the app and opening it again brings the same tabs back.
 - "New project" asks for a name (empty gives "Untitled 1", "Untitled 2"…), where to create it (first `Documents\ScrollRecord`, then the last folder used), the website (a folder, or a `http://localhost…` address) and whether to start empty or from a scenario file.
