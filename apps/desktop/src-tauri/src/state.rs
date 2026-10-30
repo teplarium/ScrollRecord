@@ -6,10 +6,12 @@
 //! Commands read from here via `tauri::State<AppState>`.
 
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use sr_diagnostics::LogGuard;
 use sr_project::ProjectStore;
+
+use crate::jobs::Jobs;
 
 /// Shared state of the running desktop app.
 pub struct AppState {
@@ -19,6 +21,8 @@ pub struct AppState {
     projects: ProjectStore,
     /// Project folders open as tabs in this window.
     open: Mutex<Vec<String>>,
+    /// Long jobs (site maps; later renders) and their cancel flags.
+    jobs: Arc<Jobs>,
 }
 
 impl AppState {
@@ -28,6 +32,7 @@ impl AppState {
             log_guard: Mutex::new(log_guard),
             projects,
             open: Mutex::new(Vec::new()),
+            jobs: Arc::new(Jobs::default()),
         }
     }
 
@@ -43,6 +48,16 @@ impl AppState {
     /// The project store.
     pub fn projects(&self) -> &ProjectStore {
         &self.projects
+    }
+
+    /// The running long jobs.
+    pub fn jobs(&self) -> &Jobs {
+        &self.jobs
+    }
+
+    /// A handle to the jobs list for a job's own thread (to finish itself).
+    pub fn jobs_handle(&self) -> Arc<Jobs> {
+        Arc::clone(&self.jobs)
     }
 
     /// Remembers that a project is open in this window.

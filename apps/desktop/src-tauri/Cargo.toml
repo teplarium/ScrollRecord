@@ -23,6 +23,7 @@ tauri-build.workspace = true
 sr-core.workspace = true
 sr-project.workspace = true
 sr-ipc.workspace = true
+sr-analyzer.workspace = true
 sr-diagnostics.workspace = true
 serde.workspace = true
 serde_json.workspace = true

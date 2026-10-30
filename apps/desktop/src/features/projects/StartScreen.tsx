@@ -34,6 +34,8 @@ type Props = {
   onNoticeDismiss: () => void;
   /** A project was created or opened: show it as a tab. */
   onOpened: (project: OpenedProject) => void;
+  /** Whether a project folder is open in a tab (it can't be deleted then). */
+  isOpen: (dir: string) => boolean;
 };
 
 /** A failure, and the folder to retry with "Open anyway" for SR-1005. */
@@ -44,7 +46,7 @@ export function openFailure(error: AppError, dir: string): OpenFailure {
   return error.code === "SR-1005" ? { error, lockedDir: dir } : { error };
 }
 
-export function StartScreen({ startWithForm, notice, onNoticeDismiss, onOpened }: Props) {
+export function StartScreen({ startWithForm, notice, onNoticeDismiss, onOpened, isOpen }: Props) {
   const { t } = useTranslation();
   const [home, setHome] = useState<ProjectHome | null>(null);
   const [showForm, setShowForm] = useState(startWithForm);
@@ -80,6 +82,14 @@ export function StartScreen({ startWithForm, notice, onNoticeDismiss, onOpened }
       home?.suggestedLocation,
     );
     if (dir) await open(dir);
+  }
+
+  async function trash(dir: string) {
+    setFailure(null);
+    const result = await commands.trashProject(dir);
+    if (!result.ok) setFailure({ error: result.error });
+    const refreshed = await commands.projectHome();
+    if (refreshed.ok) setHome(refreshed.value);
   }
 
   async function forget(dir: string) {
@@ -150,7 +160,9 @@ export function StartScreen({ startWithForm, notice, onNoticeDismiss, onOpened }
           <RecentList
             recent={home?.recent ?? []}
             onOpen={(dir) => void open(dir)}
+            isOpen={isOpen}
             onForget={(dir) => void forget(dir)}
+            onTrash={(dir) => void trash(dir)}
           />
         </section>
       </div>

@@ -5,7 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.3 — the site map lists the site's blocks and buttons
+- The "Site map" panel now shows each page's blocks (marked with `data-sr`, plus those the scenario uses) and, when you open a block, its buttons, links, fields and other things the cursor can use — each with a small icon, like layers in Figma. A red dot means the block is already in the scenario; a warning means the scenario uses a block this device doesn't have.
+- The site is read automatically when a project opens and when you switch the device (the map can differ: a phone shows "Open menu" instead of the menu links). While it reads, a progress line with "Cancel" is shown.
+- Results are kept in the project's `cache` folder, so reopening a project or switching back to a device shows the map at once. The cache is renewed automatically when the site's files or the scenario's blocks change. "Read the site again" (↻) ignores it, "Clear cached site data" deletes it. For a site given as an address (`http://localhost…`) the last map is shown dimmed while it is read again.
+
+### Editor, step 3.3a — reading the site for the site map (under the hood)
+- ScrollRecord can now read a website the way the video will see it (same browser, same device, same page preparation) and list its blocks — the parts marked with `data-sr` plus the blocks the scenario already uses — and, inside each block, the buttons, links, fields, checkboxes, tabs and other things the cursor can use. For each of them it also works out how to find it again when recording, and keeps only ways that find exactly that element. One page takes about a second. The site map panel shows this in the next step.
+- A block the scenario names but the site doesn't have (on this device) is listed with a warning instead of failing.
+- New error code SR-0004 (stopped by the user), for long jobs that get a "Cancel" button.
+
 ### Editor, step 3.2 — the editor window and the scenario canvas
+- Deleting a project is now deliberate: the trash can on its row in "Recent projects" asks first and then moves the project folder to the Recycle Bin (it can be restored from there; the website is not touched). A project that is open in a tab can't be deleted — close its tab first. The × on a tab only closes the project. Before, the × in the list removed even an open project from the list, which then also vanished from the tabs restored at the next start.
+- New error code SR-1007 (the project couldn't be moved to the Recycle Bin; nothing was deleted).
 - Choosing files is clearer: the website is chosen by picking its start page (`index.html`) and an existing project by picking its `project.json` — the windows show files instead of an empty-looking folder. Every file window also offers "All files".
 - A project tab is now the editor: "Site map" on the left (the website, Start, End and the site's pages; blocks and buttons arrive in the next step), the canvas in the middle, properties on the right.
 - The canvas shows the scenario: Start and End as ovals, each block as a card with its name and pause ("1.5 s", "No stop"), and the arrows between them. Move around with the mouse wheel or touchpad (or by dragging), zoom with Ctrl+wheel; small buttons zoom and "show the whole scenario", the mini map shows where you are. Editing on the canvas comes in step 3.4.

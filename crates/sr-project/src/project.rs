@@ -279,6 +279,51 @@ impl ProjectStore {
         self.update_config(|c| c.forget(&shown));
     }
 
+    /// Moves a closed project's folder to the system Recycle Bin / Trash and
+    /// removes it from the recent list. The site folder is never touched.
+    /// Why the Recycle Bin: deleting is one click away in the recent list, and
+    /// a mistake must be recoverable (owner decision, step 3.2).
+    ///
+    /// Errors: `SR-1003` (not a project), `SR-1005` (open in a window, this
+    /// one included — close the tab first), `SR-1007` (the move failed;
+    /// nothing was deleted).
+    pub fn move_to_trash(&self, dir: &Path) -> AppResult<()> {
+        self.remove_with(dir, |path| {
+            trash::delete(path).map_err(|err| err.to_string())
+        })
+    }
+
+    /// [`Self::move_to_trash`] with the folder removal supplied by the
+    /// caller. Tests use it so they never fill the real Recycle Bin.
+    pub fn remove_with(
+        &self,
+        dir: &Path,
+        remove: impl FnOnce(&Path) -> Result<(), String>,
+    ) -> AppResult<()> {
+        ProjectManifest::read(dir)?;
+        if let Some(pid) = lock::holder(dir) {
+            return Err(AppError::new(
+                ErrorCode::ProjectLocked,
+                format!("{} is open (process {pid}), not deleting it", dir.display()),
+            )
+            .with_param("path", dir.display())
+            .with_param("pid", pid));
+        }
+        remove(dir).map_err(|detail| {
+            AppError::new(
+                ErrorCode::ProjectTrashFailed,
+                format!(
+                    "could not move {} to the Recycle Bin: {detail}",
+                    dir.display()
+                ),
+            )
+            .with_param("path", dir.display())
+            .with_param("detail", detail)
+        })?;
+        self.forget(dir);
+        Ok(())
+    }
+
     /// How a site folder or address picked by the user is written into the
     /// scenario of the project at `dir` (relative when inside or next to the
     /// project, else absolute; URLs unchanged). The UI puts the result into

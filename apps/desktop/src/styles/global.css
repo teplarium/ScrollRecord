@@ -132,6 +132,16 @@ p {
   filter: brightness(1.08);
 }
 
+/* Destructive actions (delete): red outline, so it never looks like the main action. */
+.button--danger {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.button--danger:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
 .input {
   width: 100%;
   min-width: 0;

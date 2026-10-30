@@ -12,8 +12,36 @@
   font-size: var(--text-sm);
 }
 
+.site-map__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-map__icon-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.site-map__icon-button:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.site-map__icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .site-map__title {
-  margin: 0 0 var(--space-1);
+  margin: 0;
   font-size: var(--text-sm);
   font-weight: 650;
 }
@@ -98,8 +126,104 @@
   white-space: nowrap;
 }
 
-.site-map__later {
-  margin: var(--space-2) 0 0;
+/* ── Tree ── */
+
+.site-map__list--nested {
+  padding-left: var(--space-4);
+}
+
+/* While a new run goes, the previous device's map is shown dimmed. */
+.site-map__list--stale {
+  opacity: 0.55;
+}
+
+.site-map__row--toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.site-map__row--toggle:disabled {
+  cursor: default;
+}
+
+.site-map__row--missing {
+  color: var(--warning);
+}
+
+/* An element with no unique locator can't be used by the cursor yet. */
+.site-map__row--weak {
+  opacity: 0.5;
+}
+
+.site-map__row--element {
+  font-size: var(--text-xs);
+}
+
+.site-map__chevron {
+  flex: none;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+
+.site-map__chevron--open {
+  transform: rotate(90deg);
+}
+
+.site-map__chevron-space {
+  flex: none;
+  width: 12px;
+}
+
+.site-map__icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.site-map__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dot: this block is already in the scenario. */
+.site-map__used {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.site-map__note {
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-6);
   color: var(--text-muted);
   font-size: var(--text-xs);
+}
+
+.site-map__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.site-map__link {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: var(--space-2) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  cursor: pointer;
 }

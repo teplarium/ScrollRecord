@@ -903,5 +903,13 @@
       }
       return result;
     },
+
+    /**
+     * The locator engine itself, for the editor's site map (`sr-analyzer`):
+     * it checks that a suggested locator finds exactly one element with the
+     * very rules the recording uses. Read-only helpers; recording never
+     * calls them through here.
+     */
+    locate: Object.freeze({ findAll, accessibleName, norm, visible, describe }),
   });
 })();

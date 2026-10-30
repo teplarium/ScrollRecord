@@ -71,6 +71,13 @@ pub async fn forget_recent(state: State<'_, AppState>, dir: String) -> Result<()
     Ok(())
 }
 
+/// Moves a closed project's folder to the Recycle Bin / Trash and removes it
+/// from the recent list. Errors: SR-1003, SR-1005 (still open), SR-1007.
+#[tauri::command]
+pub async fn trash_project(state: State<'_, AppState>, dir: String) -> Result<(), AppError> {
+    state.projects().move_to_trash(Path::new(&dir))
+}
+
 /// Reads a scenario file to import into the open project `dir`. Nothing is
 /// written: the editor puts it into its undo history. Errors: SR-1001,
 /// SR-2001, SR-2003.

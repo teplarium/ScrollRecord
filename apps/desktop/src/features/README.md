@@ -8,7 +8,7 @@ One exception: `editor/Editor.tsx` is the screen that assembles the editor panel
 | ---------------- | ------------------- | ---------------------------------------------------------------------------- |
 | `projects/`      | Phase 3 (step 3.1b) | Home tab: new project form, open project, recent projects                    |
 | `editor/`        | Phase 3 (step 3.2)  | Project tab layout (D-38), right panel's top row, properties (until 3.5)     |
-| `site-map/`      | Phase 3 (step 3.2)  | Left panel: pages → blocks → interactive elements, previews (D-38/D-39)      |
+| `site-map/`      | Phase 3 (step 3.3)  | Left panel: pages → blocks → interactive elements, previews (D-38/D-39)      |
 | `settings/`      | Phase 0 (language)  | Language, paths, browser and ffmpeg locations                                |
 | `canvas/`        | Phase 3 (step 3.2)  | React Flow canvas: Start/End, block cards, Navigate, arrows (no page boards) |
 | `inspector/`     | Phase 3             | Properties panel of the selected node or arrow                               |

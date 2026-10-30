@@ -13,7 +13,7 @@ import { commands } from "../shared/ipc/commands";
 import type { OpenedProject } from "../shared/ipc/generated/OpenedProject";
 import { AppFooter } from "./AppFooter";
 import { TabBar } from "./TabBar";
-import { activeProject, initialTabs, tabsReducer } from "./tabs";
+import { activeProject, initialTabs, sameDir, tabsReducer } from "./tabs";
 import "./App.css";
 
 export function App() {
@@ -93,6 +93,7 @@ export function App() {
           notice={restoreFailure}
           onNoticeDismiss={() => setRestoreFailure(null)}
           onOpened={opened}
+          isOpen={(dir) => tabs.projects.some((p) => sameDir(p.dir, dir))}
         />
       )}
       <AppFooter />

@@ -59,7 +59,7 @@ The UI talks to Rust only through **IPC commands** whose types are **generated**
 | Crate | Status | Purpose | Key files |
 |---|---|---|---|
 | `sr-core` | ✅ | Scenario format v1, easing, `SR-xxxx` error catalog, validation, per-target plan. **No IO** | `flow/mod.rs` (types, parsing), `flow/path.rs` (validation + `plan()`), `flow/target.rs` (devices, aspect, resolution → pixel geometry), `flow/locator.rs`, `flow/action.rs` (hover/click/move/wait), `flow/cursor.rs` (cursor settings, scroll behaviour), `easing.rs`, `error.rs` |
-| `sr-project` | ✅ | Project folder: create / open / save / close, atomic writes with `.bak`, lock file, recent projects + open tabs (`projects.json`), portable site paths, scenario import/export. No Tauri | `project.rs` (`ProjectStore`, IPC types), `manifest.rs` (`project.json`), `fsio.rs` (atomic write, path clean-up), `lock.rs`, `config.rs`, `site.rs`; tests: `tests/project.rs` |
+| `sr-project` | ✅ | Project folder: create / open / save / close, atomic writes with `.bak`, lock file, recent projects + open tabs (`projects.json`), portable site paths, scenario import/export, delete = move to the Recycle Bin (`trash` crate). No Tauri | `project.rs` (`ProjectStore`, IPC types), `manifest.rs` (`project.json`), `fsio.rs` (atomic write, path clean-up), `lock.rs`, `config.rs`, `site.rs`; tests: `tests/project.rs` |
 | `sr-ipc` | ✅ | IPC contract DTOs, exported to TypeScript; re-exports `Flow` (sr-core) and the project types (sr-project) | `app_info.rs`, `lib.rs` |
 | `sr-diagnostics` | ✅ | Logging setup (later: problem-report zip) | `lib.rs` |
 | `sr-site` | ✅ | Site source: folder → built-in HTTP server on 127.0.0.1 (std only: thread per connection, byte ranges, clean URLs, single-page-app fallback), or URL | `lib.rs` (`SiteSource`, `serve`), `server.rs` |
@@ -71,7 +71,7 @@ The UI talks to Rust only through **IPC commands** whose types are **generated**
 | `sr-encoder` | ✅ | `VideoSink`s for raw RGBA frames: ffmpeg pipe (MP4 H.264, WebM VP9) and PNG folder | `lib.rs` |
 | `sr-render` | ✅ | Orchestrator used by CLI (and later the app): `Renderer::start/render/finish`, probe + reload, compositing worker thread, output naming, `timeline.json` | `lib.rs`; tests: `tests/render_fixture.rs` (fixture 01), `tests/heavy_sites.rs` (fixtures 02–06) |
 | `sr-cli` | ✅ | `scrollrecord` command: `render`, `validate`, `info`, `errors` | `main.rs`, `commands/*.rs` |
-| `sr-analyzer` | ⏳ Phase 3 | Site map for the editor: blocks (`data-sr` + scenario blocks), their interactive elements, boxes, locators, pictures (ADR 0006 update, D-38/D-39); later block auto-detection (Phase 4), site digest (Phase 5) | — |
+| `sr-analyzer` | ✅ Phase 3 (3.3) | Site map for the editor: opens each scenario page like the renderer and lists blocks (`data-sr` + scenario blocks) and their interactive elements with boxes and locator candidates checked by the recording's own engine (ADR 0006 update, D-38/D-39); project cache `cache/sitemap/<target>/<fingerprint>.json` + the site map job (events for the UI). Next: pictures (3.6); later block auto-detection (Phase 4), site digest (Phase 5) | `lib.rs` (`analyze`, progress, cancel), `model.rs` (`SiteMap` → TypeScript), `cache.rs` (fingerprint, cache, `site_map_job`, `SiteMapEvent`), `js/sitemap.js` (in-page part); tests: `tests/analyzer.rs` (real browser), unit tests in `cache.rs` |
 | `sr-skill` | ⏳ Phase 5 | AI skill packages | — |
 
 Crates are created only when their phase starts (HANDOFF D-18).
@@ -82,7 +82,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|
 | `src/main.rs` | Binary entry; hides the console window on Windows release builds |
 | `src/lib.rs` | `run()`: logging start, state, **list of registered IPC commands** |
-| `src/state.rs` | `AppState`: process-wide state (log guard, `ProjectStore`, projects open in this window — locks released on exit) |
+| `src/state.rs` | `AppState`: process-wide state (log guard, `ProjectStore`, projects open in this window — locks released on exit, running jobs) |
+| `src/jobs.rs` | Long jobs: job id + cancel flag; the work runs on its own thread and reports over a Tauri `Channel` (ADR 0006 §4); app exit cancels all |
 | `src/commands/` | One file per feature area; thin handlers returning `Result<T, AppError>` |
 | `tauri.conf.json` | Window, bundle targets (NSIS, deb, AppImage), identifier `io.github.teplarium.scrollrecord` |
 | `capabilities/default.json` | Permissions of the main window: `core:default`, `dialog:allow-open` (folder/file pickers) |
@@ -100,7 +101,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | `features/editor/TopActions.tsx`, `PropertiesPanel.tsx` | Right panel: device switcher + preview/render/queue (disabled until 3.7/3.8); selected shape (settings in 3.5) |
 | `features/canvas/Canvas.tsx`, `nodes.tsx` | React Flow canvas (read-only until 3.4): pan/zoom/minimap, Start/End, block card, Navigate shapes |
 | `features/canvas/toReactFlow.ts`, `autoLayout.ts`, `cardSize.ts`, `layout.ts` | Scenario → shapes and arrows; own auto-layout (FR-CNV-12); card = device shape ≤ 800 px (D-39); `layout.json` format v1 (tests: `canvas.test.ts`) |
-| `features/site-map/SiteMap.tsx` | Left panel: site, Start/End, pages (blocks in 3.3) |
+| `features/site-map/SiteMap.tsx`, `icons.tsx` | Left panel: site, Start/End, tree page → blocks → elements (list mode), progress + Cancel, "Read the site again", "Clear cached site data" |
+| `features/site-map/useSiteMap.ts`, `siteMapState.ts` | Runs the site map job per device (cancels outdated runs); job events → state as a tested reducer (`siteMapState.test.ts`) |
 | `features/settings/LanguageSelect.tsx` | UI language picker |
 | `features/README.md` | Planned feature folders and the "no cross-feature imports" rule |
 | `shared/ipc/commands.ts` | **Typed wrappers for every IPC command** (returns `IpcResult<T>`) |
@@ -168,12 +170,16 @@ Crates are created only when their phase starts (HANDOFF D-18).
 |---|---|---|---|---|
 | `app_info` | `src-tauri/src/commands/app.rs` | `commands.appInfo()` | `AppInfo` | `useAppInfo` → `AppFooter` |
 | `device_presets` | `src-tauri/src/commands/app.rs` | `commands.devicePresets()` | `DevicePreset[]` | `Editor` (card shapes, device sizes) |
+| `start_site_map` | `src-tauri/src/commands/site_map.rs` (thread + `jobs.rs`) | `commands.startSiteMap(dir, flow, target, fresh, onEvent)` | job id; `SiteMapEvent`s on a `Channel` | `useSiteMap` (site map panel) |
+| `cancel_job` | `src-tauri/src/commands/site_map.rs` | `commands.cancelJob(job)` | `null` | `useSiteMap` (Cancel, device switch, tab close) |
+| `clear_cache` | `src-tauri/src/commands/site_map.rs` | `commands.clearCache(dir)` | `null` | site map "Clear cached site data" |
 | `project_home` | `src-tauri/src/commands/project.rs` | `commands.projectHome()` | `ProjectHome` | `App` (restore tabs), `StartScreen` |
 | `create_project` | `src-tauri/src/commands/project.rs` | `commands.createProject(request)` | `OpenedProject` | `NewProjectForm` |
 | `open_project` | `src-tauri/src/commands/project.rs` | `commands.openProject(dir, force)` | `OpenedProject` | `App`, `StartScreen` |
 | `save_project` | `src-tauri/src/commands/project.rs` | `commands.saveProject(dir, flow, layout)` | `null` | `Editor` ("Locate site folder…"; later: 3.4 autosave) |
 | `close_project` | `src-tauri/src/commands/project.rs` | `commands.closeProject(dir)` | `null` | `App` (tab close) |
-| `forget_recent` | `src-tauri/src/commands/project.rs` | `commands.forgetRecent(dir)` | `null` | `StartScreen` (recent list) |
+| `forget_recent` | `src-tauri/src/commands/project.rs` | `commands.forgetRecent(dir)` | `null` | `StartScreen` (recent list, missing projects only) |
+| `trash_project` | `src-tauri/src/commands/project.rs` | `commands.trashProject(dir)` | `null` | `StartScreen` (recent list trash can; closed projects only) |
 | `portable_site` | `src-tauri/src/commands/project.rs` | `commands.portableSite(dir, site)` | `string \| null` | `Editor` ("Locate site folder…") |
 | `import_flow` | `src-tauri/src/commands/project.rs` | `commands.importFlow(dir, file)` | `ImportedFlow` | (editor) |
 | `export_flow` | `src-tauri/src/commands/project.rs` | `commands.exportFlow(dir, dest)` | `null` | (editor) |
@@ -221,6 +227,8 @@ Crates are created only when their phase starts (HANDOFF D-18).
 | CI: error code tests fail | Add `## SR-xxxx` to `docs/ERRORS.md` and `errors.SR-xxxx` to `en/common.json` |
 | ESLint `react/jsx-no-literals` | Move visible text to the locale file, use `t("...")` |
 | Window doesn't open on Linux | Install `libwebkit2gtk-4.1-0` |
+| Site map is empty / spins / shows an error | Error text in the panel (SR-3001 = no Chrome, SR-80xx = site); `useSiteMap.ts` (job start/cancel), `src-tauri/src/jobs.rs`, `commands/site_map.rs`; stale results: `sr-analyzer/src/cache.rs` (fingerprint) — "Read the site again" skips the cache |
+| Site map misses a block or a button, or suggests a locator that fails when recording | `sr-analyzer/js/sitemap.js` (`INTERACTIVE`, `kindOf`, `candidates` — every candidate is checked with `__sr.locate.findAll` + the `within` rule of `__sr.measure`); test `every_suggested_locator_finds_exactly_its_element_when_recording` |
 | Canvas: shapes overlap / in odd places, or a scenario opens empty | `features/canvas/layout.ts` (`readLayout`: broken `layout.json` → auto-layout) and `autoLayout.ts`; tests `canvas.test.ts` |
 | Canvas: block cards have the wrong shape for a device | `features/canvas/cardSize.ts` (`screenOf`, `cardSize`); `device_presets` → `Viewport::presets()` in `sr-core/src/flow/target.rs` |
 
@@ -247,7 +255,7 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 
 1. `sr-core` depends on no other ScrollRecord crate.
 2. Library crates never depend on `sr-cli` or `sr-desktop`.
-3. Order (lower may not import higher): `core` → `project` → `ipc` / `diagnostics` / `site` / `browser` / `timeline` / `cursor` → `capture` / `compositor` → `encoder` → `render` → `cli` / `desktop`. (`encoder` needs neither `capture` nor `compositor`: it takes plain RGBA.)
+3. Order (lower may not import higher): `core` → `project` → `ipc` / `diagnostics` / `site` / `browser` / `timeline` / `cursor` → `analyzer` / `capture` / `compositor` → `encoder` → `render` → `cli` / `desktop`. (`encoder` needs neither `capture` nor `compositor`: it takes plain RGBA.)
 4. UI features import from `shared/` and `i18n/`, never from another feature. Exception: `features/editor/Editor.tsx` assembles the editor panels (`canvas`, `site-map`) the way `app/App.tsx` assembles screens.
 5. The UI reaches Rust **only** through `shared/ipc/commands.ts`.
 
@@ -267,5 +275,8 @@ Environment variables: `SR_LOG=debug` (log level), `SR_BROWSER=<path>` (browser)
 | 2026-10-28 | Step 3.0: ADR 0006 (editor architecture, accepted with the owner's answers); Phase 3 steps re-split in `docs/phase-3-plan.md`. No code changes |
 | 2026-10-29 | Editor layout from the owner (HANDOFF D-38, D-39): project tabs, left "Site map" panel, canvas with the scenario only, right properties panel; no page boards / inspector mode. ADR 0006 "Update 2026-10-29", Phase 3 steps re-split. No code changes |
 | 2026-10-29 | Step 3.1a: new crate `sr-project`; scenario types (`sr-core::flow`) exported to TypeScript (`Node` is `FlowNode` there); project IPC commands + `commands.ts` wrappers; `AppState` holds the `ProjectStore`; codes SR-1003…1006 |
+| 2026-10-30 | Step 3.3b: `src-tauri/src/jobs.rs` (first long job), `commands/site_map.rs` (`start_site_map`, `cancel_job`, `clear_cache`); `sr-analyzer/src/cache.rs`; `features/site-map/{useSiteMap,siteMapState,icons}` |
+| 2026-10-30 | Step 3.3a: new crate `sr-analyzer` (site map: `analyze`, `SiteMap` types, `js/sitemap.js`); `runtime.js` exposes `__sr.locate` (locator engine, read-only); SR-0004 Cancelled |
+| 2026-10-30 | Step 3.2 follow-up: `trash` crate in `sr-project` (`ProjectStore::move_to_trash` / `remove_with`), command `trash_project`, SR-1007; site/project picked through a file (`shared/ipc/dialogs.ts`) |
 | 2026-10-29 | Step 3.2: `@xyflow/react` 12.12; `features/editor/` (Editor, TopActions, PropertiesPanel; placeholder removed), `features/canvas/`, `features/site-map/`; command `device_presets` (`DevicePreset`); fixture `tests/fixtures/flows/long-250.srflow.json` |
 | 2026-10-29 | Step 3.1b: `tauri-plugin-dialog` (+ `dialog:allow-open`); `app/TabBar.tsx`, `app/tabs.ts`; `features/projects/NewProjectForm.tsx`, `RecentList.tsx`; `features/editor/` (placeholder); `shared/ipc/dialogs.ts`; command `portable_site`; shared control styles in `global.css` |

@@ -56,6 +56,15 @@ pub(crate) fn acquire(dir: &Path, force: bool) -> AppResult<()> {
     fs::write(&path, text).map_err(|err| fsio::write_error(&path, &err))
 }
 
+/// The process that has the project open, if any (this app included).
+/// A garbled lock counts as none, like in [`acquire`].
+pub(crate) fn holder(dir: &Path) -> Option<u32> {
+    fs::read_to_string(dir.join(LOCK_FILE))
+        .ok()
+        .and_then(|text| serde_json::from_str::<LockInfo>(&text).ok())
+        .map(|info| info.pid)
+}
+
 /// Removes the lock if this process holds it (a lock taken over by another
 /// window after "open anyway" is left alone).
 pub(crate) fn release(dir: &Path) {

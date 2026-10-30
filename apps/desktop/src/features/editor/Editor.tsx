@@ -24,6 +24,7 @@ import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import { Canvas } from "../canvas/Canvas";
 import { screenOf } from "../canvas/cardSize";
 import { SiteMap } from "../site-map/SiteMap";
+import { useSiteMap } from "../site-map/useSiteMap";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { TopActions } from "./TopActions";
 import "./Editor.css";
@@ -63,6 +64,8 @@ export function Editor({ project, onChange }: Props) {
   const target = flow.targets.find((tg) => tg.id === targetId) ?? flow.targets[0];
   const screen = useMemo(() => screenOf(target?.viewport, presets), [target, presets]);
   const selected = flow.nodes.find((n) => n.id === selectedId) ?? null;
+  // The site map of the shown device; not read while the site folder is missing.
+  const siteMap = useSiteMap(project.dir, flow, project.siteMissing ? null : (target?.id ?? null));
 
   async function locateSite() {
     const picked = await pickSiteFolder(t("siteMap.locateTitle"), {
@@ -85,6 +88,7 @@ export function Editor({ project, onChange }: Props) {
         flow={flow}
         siteMissing={project.siteMissing}
         onLocateSite={() => void locateSite()}
+        siteMap={siteMap}
       />
       <section className="editor__canvas" aria-label={t("canvas.title")}>
         {error && (

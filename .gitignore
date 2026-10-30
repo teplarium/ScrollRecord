@@ -12,6 +12,11 @@ node_modules/
 renders/
 /dist/
 
+# ScrollRecord project lock ("open in a window"), never shared
+.scrollrecord.lock
+# Test projects the owner creates inside the repository folder
+/Untitled */
+
 # Logs and local scratch
 *.log
 .DS_Store

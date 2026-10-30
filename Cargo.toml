@@ -38,6 +38,7 @@ sr-render = { path = "crates/sr-render" }
 sr-cursor = { path = "crates/sr-cursor" }
 sr-compositor = { path = "crates/sr-compositor" }
 sr-project = { path = "crates/sr-project" }
+sr-analyzer = { path = "crates/sr-analyzer" }
 
 # External crates
 base64 = "0.23"
@@ -53,6 +54,8 @@ tauri = { version = "2", features = [] }
 tauri-build = { version = "2", features = [] }
 # Native open-folder / open-file windows (ADR 0006 §1). Official Tauri plugin.
 tauri-plugin-dialog = "2"
+# Moves a deleted project to the Recycle Bin / Trash instead of erasing it (owner decision, step 3.2).
+trash = "5.2"
 thiserror = "2"
 tracing = "0.1"
 tracing-appender = "0.2"

@@ -13,7 +13,7 @@
  * Adding a command: register it in src-tauri `lib.rs`, add one line below,
  * add it to the "IPC map" in PROJECT_MAP.md.
  */
-import { invoke, isTauri, type InvokeArgs } from "@tauri-apps/api/core";
+import { Channel, invoke, isTauri, type InvokeArgs } from "@tauri-apps/api/core";
 
 import { appError, toAppError } from "./errors";
 import type { AppError } from "./generated/AppError";
@@ -24,6 +24,7 @@ import type { ImportedFlow } from "./generated/ImportedFlow";
 import type { NewProject } from "./generated/NewProject";
 import type { OpenedProject } from "./generated/OpenedProject";
 import type { ProjectHome } from "./generated/ProjectHome";
+import type { SiteMapEvent } from "./generated/SiteMapEvent";
 import type { JsonValue } from "./generated/serde_json/JsonValue";
 
 /** Outcome of an IPC call: either a value or a typed error. */
@@ -46,6 +47,29 @@ async function call<T>(command: string, args?: InvokeArgs): Promise<IpcResult<T>
 export const commands = {
   /** Versions and platform. Rust: `commands::app::app_info`. */
   appInfo: () => call<AppInfo>("app_info"),
+  // ── Long jobs (Rust: `jobs.rs`): a job id now, events over a Channel later ──
+
+  /**
+   * Builds (or loads from the project cache) the site map of `flow` for one
+   * target. Events: progress → (stale) → done | failed. Returns the job id
+   * for `cancelJob`. Rust: `commands::site_map::start_site_map`.
+   */
+  startSiteMap: (
+    dir: string,
+    flow: Flow,
+    target: string,
+    fresh: boolean,
+    onEvent: (event: SiteMapEvent) => void,
+  ) => {
+    const events = new Channel<SiteMapEvent>();
+    events.onmessage = onEvent;
+    return call<number>("start_site_map", { dir, flow, target, fresh, events });
+  },
+  /** Asks a running job to stop; it then reports SR-0004. Unknown ids are ignored. */
+  cancelJob: (job: number) => call<null>("cancel_job", { job }),
+  /** Deletes the project's cache folder (site maps, later pictures). */
+  clearCache: (dir: string) => call<null>("clear_cache", { dir }),
+
   /** Built-in devices and their screen sizes. Rust: `commands::app::device_presets`. */
   devicePresets: () => call<DevicePreset[]>("device_presets"),
 
@@ -65,6 +89,8 @@ export const commands = {
   closeProject: (dir: string) => call<null>("close_project", { dir }),
   /** Remove a project from the recent list; the folder is not touched. */
   forgetRecent: (dir: string) => call<null>("forget_recent", { dir }),
+  /** Move a closed project to the Recycle Bin and forget it. Errors: SR-1003, SR-1005, SR-1007. */
+  trashProject: (dir: string) => call<null>("trash_project", { dir }),
   /** How a picked site folder/address is written into `meta.site` of project `dir`. */
   portableSite: (dir: string, site: string) => call<string | null>("portable_site", { dir, site }),
   /** Read a scenario file to import into the open project `dir` (nothing is written). */

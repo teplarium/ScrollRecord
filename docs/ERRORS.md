@@ -40,6 +40,12 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 
 - **What to do:** start it with `pnpm tauri dev` (developers), or use the installed app.
 
+## SR-0004
+
+**Stopped by the user.** A long job (reading the site for the site map, later rendering) was cancelled with its "Cancel" button. Nothing is broken; partial results are thrown away.
+
+- **What to do:** nothing, or start the job again.
+
 ## SR-0101
 
 **Logging could not start.** The log folder or log file could not be created, or logging was started twice. The app keeps running, but without log files, so bug reports will lack detail.
@@ -89,6 +95,13 @@ If the fix doesn't help, please [open an issue](https://github.com/teplarium/Scr
 **A folder with this project name already exists** in the chosen location (`path` parameter). ScrollRecord never overwrites an existing folder.
 
 - **What to do:** choose another name or location, or leave the name empty to get "Untitled N".
+
+## SR-1007
+
+**The project folder could not be moved to the Recycle Bin** (`path` parameter, `detail` has the system's reason). Nothing was deleted.
+
+- **Common causes:** a file in the project is open in another program (a video player showing a render, Explorer previewing it); the folder is on a drive without a Recycle Bin (network or some USB drives); no permission.
+- **What to do:** close programs that use files from the project and try again. If the drive has no Recycle Bin, delete the folder yourself in Explorer.
 
 ## SR-2001
 

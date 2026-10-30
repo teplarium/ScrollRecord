@@ -13,6 +13,7 @@ sr-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+trash.workspace = true
 # Same features as sr-core: `serde_json::Value` fields (layout) reach TypeScript.
 ts-rs = { workspace = true, features = ["serde-json-impl", "no-serde-warnings"] }
 

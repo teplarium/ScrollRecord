@@ -217,7 +217,7 @@
   color: var(--warning);
 }
 
-.recent__forget {
+.recent__action {
   display: grid;
   place-items: center;
   width: 24px;
@@ -230,15 +230,34 @@
   opacity: 0;
 }
 
-.recent__item:hover .recent__forget,
-.recent__item--missing .recent__forget,
-.recent__forget:focus-visible {
+.recent__item:hover .recent__action,
+.recent__item--missing .recent__action,
+.recent__action:focus-visible {
   opacity: 1;
 }
 
-.recent__forget:hover {
+.recent__action:hover:not(:disabled) {
   background: var(--border);
   color: var(--text);
+}
+
+/* Open in a tab: the trash can is shown but can't be used (tooltip says why). */
+.recent__action:disabled {
+  cursor: default;
+}
+
+.recent__item:hover .recent__action:disabled {
+  opacity: 0.35;
+}
+
+/* "Move … to the Recycle Bin?" replaces the date and the button of its row. */
+.recent__confirm {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 60%;
+  font-size: var(--text-xs);
 }
 
 /* ── New project form ──────────────────────────────────────────────────── */

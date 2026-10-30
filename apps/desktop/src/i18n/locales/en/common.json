@@ -43,7 +43,12 @@
   },
   "recent": {
     "missing": "Folder not found",
-    "forget": "Remove from list"
+    "forget": "Remove from list",
+    "trash": "Delete project",
+    "trashOpen": "Close its tab first to delete this project",
+    "trashConfirm": "Move “{{name}}” to the Recycle Bin? The website itself is not deleted.",
+    "trashYes": "Delete",
+    "trashNo": "Cancel"
   },
   "newProject": {
     "title": "New project",
@@ -80,7 +85,31 @@
     "locate": "Locate site folder…",
     "locateTitle": "Choose the site's start page (index.html)",
     "pages": "Pages",
-    "blocksLater": "Blocks and buttons of each page appear here in the next step."
+    "rescan": "Read the site again",
+    "starting": "Reading the site…",
+    "reading": "Reading the site… step {{done}} of {{total}}",
+    "cancel": "Cancel",
+    "loading": "Reading…",
+    "notRead": "Not read yet.",
+    "noBlocks": "No blocks found. Mark sections of the site with data-sr=\"name\" to see them here.",
+    "inScenario": "Used in the scenario",
+    "blockMissing": "The scenario uses this block, but it wasn't found on this device. Tried: {{tried}}",
+    "noLocator": "No reliable way to find this element yet (it has no unique name or text in its block).",
+    "elementTitle": "{{kind}}: {{label}}",
+    "clearCache": "Clear cached site data",
+    "kind": {
+      "button": "Button",
+      "link": "Link",
+      "input": "Field",
+      "checkbox": "Checkbox",
+      "radio": "Radio button",
+      "select": "Drop-down",
+      "textarea": "Text area",
+      "tab": "Tab",
+      "slider": "Slider",
+      "draggable": "Draggable",
+      "other": "Element"
+    }
   },
   "canvas": {
     "title": "Scenario canvas",
@@ -121,6 +150,7 @@
     "SR-0001": "Something unexpected went wrong inside ScrollRecord. This is a bug — please report it and mention {{code}}.",
     "SR-0002": "This feature isn't built yet. It's planned for roadmap phase {{phase}}.",
     "SR-0003": "The ScrollRecord core isn't reachable. Open this interface inside the desktop app.",
+    "SR-0004": "Stopped.",
     "SR-0101": "Log files couldn't be created. The app still works, but problem reports will contain less detail.",
     "SR-1001": "A file couldn't be read. Check the path and that no other program has it locked.",
     "SR-1002": "A file couldn't be saved. Check free disk space, and close any player that still has the old video open.",
@@ -128,6 +158,7 @@
     "SR-1004": "This project was saved by a newer version of ScrollRecord (format {{version}}, this version reads {{supported}}).",
     "SR-1005": "This project is already open in another ScrollRecord window, or ScrollRecord closed unexpectedly while it was open.",
     "SR-1006": "A folder called “{{name}}” already exists there. Choose another name or location.",
+    "SR-1007": "The project couldn't be moved to the Recycle Bin, so nothing was deleted. Close programs that use its files and try again.",
     "SR-2001": "The scenario file has a mistake on line {{line}}, column {{column}}.",
     "SR-2002": "The scenario doesn't fit together: {{first}}",
     "SR-2003": "This scenario needs a newer version of ScrollRecord (format {{version}}, this version reads {{supported}}).",

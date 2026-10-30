@@ -8,3 +8,4 @@
 
 pub mod app;
 pub mod project;
+pub mod site_map;

@@ -319,3 +319,40 @@ fn a_broken_recent_list_starts_empty() {
     assert!(home.recent.is_empty());
     assert!(home.suggested_location.ends_with("ScrollRecord"));
 }
+
+#[test]
+fn deleting_moves_only_a_closed_project_and_forgets_it() {
+    let sb = Sandbox::new();
+    let store = sb.store();
+    let dir = PathBuf::from(store.create(&sb.new_project(Some("Старый"))).unwrap().dir);
+    // Stands in for the Recycle Bin, so tests never fill the real one.
+    let bin = sb.root.join("bin");
+    let to_bin = |path: &Path| fs::rename(path, &bin).map_err(|err| err.to_string());
+
+    // Open in a tab (the new project is): refused, nothing moved.
+    let err = store.remove_with(&dir, to_bin).unwrap_err();
+    assert_eq!(err.code, ErrorCode::ProjectLocked);
+    assert!(dir.join(MANIFEST_FILE).exists());
+
+    // The move fails (file in use): SR-1007, the project stays listed.
+    store.close(&dir);
+    let err = store
+        .remove_with(&dir, |_| Err("in use".to_owned()))
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::ProjectTrashFailed);
+    assert_eq!(err.params["detail"], "in use");
+    assert!(store.home().recent.iter().any(|r| r.name == "Старый"));
+
+    // Closed: moved away whole and gone from the recent list.
+    store.remove_with(&dir, to_bin).unwrap();
+    assert!(!dir.exists());
+    assert!(bin.join(MANIFEST_FILE).exists());
+    assert!(store.home().recent.is_empty());
+
+    // A folder that is not a project is never moved.
+    let plain = sb.location().join("photos");
+    fs::create_dir_all(&plain).unwrap();
+    let err = store.remove_with(&plain, to_bin).unwrap_err();
+    assert_eq!(err.code, ErrorCode::NotAProject);
+    assert!(plain.exists());
+}

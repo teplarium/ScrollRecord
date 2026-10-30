@@ -1,0 +1,21 @@
+[package]
+name = "sr-analyzer"
+description = "ScrollRecord site map for the editor: blocks and interactive elements of each page, found like the renderer finds them."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sr-core.workspace = true
+sr-site.workspace = true
+sr-browser.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+ts-rs.workspace = true
+
+[lints]
+workspace = true

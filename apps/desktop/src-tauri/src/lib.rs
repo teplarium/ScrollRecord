@@ -11,6 +11,7 @@
 //! See also: `apps/desktop/src/shared/ipc/commands.ts` (the TypeScript caller).
 
 mod commands;
+mod jobs;
 mod state;
 
 use sr_diagnostics::{LogOptions, init_logging};
@@ -74,9 +75,13 @@ pub fn run() {
             commands::project::save_project,
             commands::project::close_project,
             commands::project::forget_recent,
+            commands::project::trash_project,
             commands::project::import_flow,
             commands::project::export_flow,
             commands::project::portable_site,
+            commands::site_map::start_site_map,
+            commands::site_map::cancel_job,
+            commands::site_map::clear_cache,
         ])
         .build(tauri::generate_context!());
 
@@ -97,6 +102,7 @@ pub fn run() {
         if let tauri::RunEvent::Exit = event
             && let Some(state) = handle.try_state::<state::AppState>()
         {
+            state.jobs().cancel_all();
             state.release_all();
         }
     });

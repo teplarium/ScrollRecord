@@ -69,6 +69,8 @@ error_codes! {
     /// The UI is running outside the desktop app (e.g. in a plain browser
     /// during development), so it cannot reach the Rust core.
     DesktopShellUnavailable = "SR-0003", "UI is not running inside the desktop app";
+    /// A long job (site analysis, render) was stopped by the user.
+    Cancelled = "SR-0004", "Stopped by the user";
     /// The log folder or log file could not be created.
     LoggingInitFailed = "SR-0101", "Could not initialise logging";
 
@@ -85,6 +87,8 @@ error_codes! {
     ProjectLocked = "SR-1005", "Project is already open elsewhere";
     /// A new project would overwrite an existing folder of the same name.
     ProjectExists = "SR-1006", "A folder with this project name already exists";
+    /// A project folder could not be moved to the Recycle Bin / Trash.
+    ProjectTrashFailed = "SR-1007", "Project could not be moved to the Recycle Bin";
 
     // ── Flow format & validation ──
     /// The scenario file is not valid JSON or does not match the format.
