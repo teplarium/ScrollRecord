@@ -17,7 +17,7 @@
 pub mod app_info;
 
 pub use app_info::AppInfo;
-pub use sr_core::flow::{DevicePreset, Flow, Viewport};
+pub use sr_core::flow::{DevicePreset, Flow, Issue, Viewport};
 pub use sr_core::{AppError, AppResult, ErrorCode};
 pub use sr_project::{
     ImportedFlow, NewProject, OpenedProject, ProjectHome, ProjectManifest, RecentProject,

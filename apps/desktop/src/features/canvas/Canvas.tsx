@@ -62,6 +62,7 @@ import type { Point } from "../../shared/store/layout";
 import { useProject, type ProjectStore } from "../../shared/store/projectStore";
 import { cardSize, sourceSize, type Size } from "./cardSize";
 import { nodeTypes } from "./nodes";
+import { Problems } from "./Problems";
 import { freeSpot } from "./separate";
 import {
   buildCanvas,
@@ -69,6 +70,7 @@ import {
   openingShapes,
   type CanvasGraph,
   type CanvasNode,
+  type ShapeProblem,
 } from "./toReactFlow";
 
 type Props = {
@@ -76,6 +78,8 @@ type Props = {
   store: ProjectStore;
   /** Screen of the current device; block cards take its shape. */
   screen: Size | null;
+  /** Problems to mark on shapes and arrows (FR-CNV-09). */
+  problems: ShapeProblem[];
 };
 
 export function Canvas(props: Props) {
@@ -86,7 +90,7 @@ export function Canvas(props: Props) {
   );
 }
 
-function CanvasView({ store, screen }: Props) {
+function CanvasView({ store, screen, problems }: Props) {
   const { t } = useTranslation();
   const { fitView, screenToFlowPosition, setCenter, getZoom } = useReactFlow();
   const { flow, layout } = useProject(store, (s) => s.history.present);
@@ -101,7 +105,10 @@ function CanvasView({ store, screen }: Props) {
   const width = screen?.width ?? 0;
   const height = screen?.height ?? 0;
   const card = useMemo(() => cardSize({ width, height }), [width, height]);
-  const built = useMemo(() => buildCanvas(flow, layout, card), [flow, layout, card]);
+  const built = useMemo(
+    () => buildCanvas(flow, layout, card, problems),
+    [flow, layout, card, problems],
+  );
   // The viewport saved in the project, read once when the canvas opens.
   const [savedViewport] = useState(() => store.getState().viewport);
 
@@ -309,6 +316,7 @@ function CanvasView({ store, screen }: Props) {
         <MiniMap position="bottom-right" pannable zoomable nodeClassName={minimapClass} />
       </ReactFlow>
       {flow.nodes.length === 0 && <p className="canvas__empty">{t("canvas.empty")}</p>}
+      <Problems problems={problems} onShow={(id) => store.getState().focusNode(id)} />
     </div>
   );
 }

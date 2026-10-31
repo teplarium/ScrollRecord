@@ -7,5 +7,6 @@
 //! - has a typed wrapper in `apps/desktop/src/shared/ipc/commands.ts`.
 
 pub mod app;
+pub mod flow;
 pub mod project;
 pub mod site_map;

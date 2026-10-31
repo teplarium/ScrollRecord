@@ -148,6 +148,38 @@ describe("document edits", () => {
     expect(remove(d, ["zzz"], [])).toBe(d);
   });
 
+  it("unties Start and End from a deleted block", () => {
+    const d = doc([
+      block("hero"),
+      block("footer"),
+      {
+        kind: "start",
+        id: "start",
+        at: { block: "hero", anchor: "top", offset_px: 0 },
+        warmup_ms: 0,
+      },
+      {
+        kind: "end",
+        id: "end",
+        at: { block: "footer", anchor: "bottom", offset_px: 0 },
+        hold_ms: 800,
+      },
+    ]);
+    const nodes = remove(d, ["hero", "footer"], []).flow.nodes;
+    expect(nodes.find((n) => n.kind === "start")).toMatchObject({ at: { block: "" } });
+    expect(nodes.find((n) => n.kind === "end")).toEqual({
+      kind: "end",
+      id: "end",
+      at: null,
+      hold_ms: 800,
+    });
+    // Deleting another block leaves them as they are.
+    expect(remove(d, ["zzz"], [])).toBe(d);
+    expect(remove(d, ["footer"], []).flow.nodes.find((n) => n.kind === "start")).toMatchObject({
+      at: { block: "hero" },
+    });
+  });
+
   it("moves only what changed and sets the site", () => {
     const d = moveNodes(doc([block("a")]), { a: { x: 3, y: 4 } });
     expect(moveNodes(d, { a: { x: 3, y: 4 } })).toBe(d);

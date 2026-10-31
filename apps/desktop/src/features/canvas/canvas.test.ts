@@ -147,11 +147,15 @@ describe("buildCanvas", () => {
     const { nodes } = buildCanvas(scenario, emptyLayout, card);
     const hero = nodes.find((n) => n.id === "hero")!;
     expect(hero.type).toBe("block");
-    expect(hero.data).toEqual({ name: "hero", holdMs: 1500, actions: 0 });
+    expect(hero.data).toEqual({ problem: null, name: "hero", holdMs: 1500, actions: 0 });
     expect([hero.width, hero.height]).toEqual([800, 450]);
     // No `hold_ms` → the scenario default.
     expect(nodes.find((n) => n.id === "plain")!.data).toMatchObject({ holdMs: 1200 });
-    expect(nodes.find((n) => n.id === "end")!.data).toEqual({ kind: "end", holdMs: 800 });
+    expect(nodes.find((n) => n.id === "end")!.data).toEqual({
+      problem: null,
+      kind: "end",
+      holdMs: 800,
+    });
   });
 
   it("prefers saved positions and auto-lays out the rest", () => {
@@ -244,6 +248,27 @@ describe("freeSpot (shapes clicked in from the site map)", () => {
     const spot = freeSpot(boxes, { x: 0, y: 10 }, TERMINAL_SIZE);
     expect(spot).toEqual({ x: 0, y: 200 + card.height + MIN_GAP });
     expect(freeSpot(boxes, { x: 5000, y: 0 }, TERMINAL_SIZE)).toEqual({ x: 5000, y: 0 });
+  });
+});
+
+describe("problems on shapes and arrows (FR-CNV-09)", () => {
+  it("marks the worst severity with every reason, and the broken arrow", () => {
+    const { nodes, edges } = buildCanvas(
+      flow([block("a"), block("b")], chain("a", "b")),
+      emptyLayout,
+      card,
+      [
+        { severity: "warning", text: "not on the path", node: "a", edge: null },
+        { severity: "error", text: "no locator", node: "a", edge: null },
+        { severity: "error", text: "bad speed", node: null, edge: 0 },
+      ],
+    );
+    expect(nodes[0]!.data.problem).toEqual({
+      severity: "error",
+      text: "not on the path\nno locator",
+    });
+    expect(nodes[1]!.data.problem).toBeNull();
+    expect(edges[0]!.className).toBe("canvas-edge--error");
   });
 });
 

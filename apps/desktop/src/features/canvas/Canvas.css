@@ -202,3 +202,144 @@
 .canvas .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--focus);
 }
+
+/* ── Problems (FR-CNV-09): outline + "!" badge, reasons on hover ──
+   Sizes divide by the zoom so they stay visible when zoomed out. */
+
+.canvas .canvas-shape--error {
+  outline: calc(4px / var(--canvas-zoom, 1)) solid var(--accent);
+  outline-offset: calc(3px / var(--canvas-zoom, 1));
+}
+
+.canvas .canvas-shape--warning {
+  outline: calc(4px / var(--canvas-zoom, 1)) dashed var(--warning);
+  outline-offset: calc(3px / var(--canvas-zoom, 1));
+}
+
+.canvas-badge {
+  position: absolute;
+  top: calc(-12px / var(--canvas-zoom, 1));
+  right: calc(-12px / var(--canvas-zoom, 1));
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: calc(24px / var(--canvas-zoom, 1));
+  height: calc(24px / var(--canvas-zoom, 1));
+  border-radius: 50%;
+  color: #fff;
+  font-size: calc(15px / var(--canvas-zoom, 1));
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* The mark is drawn by CSS: it is a symbol, not text to translate. */
+.canvas-badge::after {
+  content: "!";
+}
+
+.canvas-badge--error {
+  background: var(--accent);
+}
+
+.canvas-badge--warning {
+  background: var(--warning);
+  color: #000;
+}
+
+.canvas .react-flow__edge.canvas-edge--error .react-flow__edge-path {
+  stroke: var(--accent);
+}
+
+.canvas .react-flow__edge.canvas-edge--warning .react-flow__edge-path {
+  stroke: var(--warning);
+}
+
+/* ── "N problems" button and list (top-left of the canvas) ── */
+
+.canvas-problems {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  max-width: min(420px, 70%);
+}
+
+.canvas-problems__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.canvas-problems__toggle--error {
+  color: var(--accent);
+}
+
+.canvas-problems__toggle--warning {
+  color: var(--warning);
+}
+
+.canvas-problems__list {
+  max-height: 50vh;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  list-style: none;
+}
+
+.canvas-problems__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-problems__row:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.canvas-problems__row:disabled {
+  cursor: default;
+}
+
+.canvas-problems__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.canvas-problems__dot--error {
+  background: var(--accent);
+}
+
+.canvas-problems__dot--warning {
+  background: var(--warning);
+}
+
+.canvas-problems__node {
+  margin-right: var(--space-1);
+}

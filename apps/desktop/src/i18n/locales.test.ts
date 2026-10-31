@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import errorCodes from "../shared/ipc/generated/error-codes.json";
+import issueKinds from "../shared/ipc/generated/issue-kinds.json";
 import { DEFAULT_LANGUAGE, LOCALES } from "./locales";
 
 /** Flattens `{ a: { b: "x" } }` into `{ "a.b": "x" }`. */
@@ -33,6 +34,11 @@ describe("locales", () => {
 
   it("has English text for every Rust error code", () => {
     const missing = errorCodes.filter((code) => !(`errors.${code}` in english));
+    expect(missing).toEqual([]);
+  });
+
+  it("has English text for every kind of scenario problem", () => {
+    const missing = issueKinds.filter((kind) => !(`issues.${kind}` in english));
     expect(missing).toEqual([]);
   });
 

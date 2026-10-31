@@ -21,6 +21,7 @@ import type { AppInfo } from "./generated/AppInfo";
 import type { DevicePreset } from "./generated/DevicePreset";
 import type { Flow } from "./generated/Flow";
 import type { ImportedFlow } from "./generated/ImportedFlow";
+import type { Issue } from "./generated/Issue";
 import type { NewProject } from "./generated/NewProject";
 import type { OpenedProject } from "./generated/OpenedProject";
 import type { ProjectHome } from "./generated/ProjectHome";
@@ -69,6 +70,12 @@ export const commands = {
   cancelJob: (job: number) => call<null>("cancel_job", { job }),
   /** Deletes the project's cache folder (site maps, later pictures). */
   clearCache: (dir: string) => call<null>("clear_cache", { dir }),
+
+  /**
+   * Every problem of a scenario (also unsaved), with the shape or arrow it is
+   * about. Never fails inside the app. Rust: `commands::flow::validate_flow`.
+   */
+  validateFlow: (flow: Flow) => call<Issue[]>("validate_flow", { flow }),
 
   /** Built-in devices and their screen sizes. Rust: `commands::app::device_presets`. */
   devicePresets: () => call<DevicePreset[]>("device_presets"),

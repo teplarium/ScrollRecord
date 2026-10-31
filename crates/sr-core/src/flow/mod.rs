@@ -14,6 +14,7 @@
 
 mod action;
 mod cursor;
+mod issue;
 mod locator;
 mod path;
 mod target;
@@ -25,6 +26,7 @@ use ts_rs::TS;
 
 pub use action::{Action, ActionKind, Point, PointerMode};
 pub use cursor::{CursorKind, CursorSettings, DEFAULT_CURSOR_PACK, ScrollCursor};
+pub use issue::{Issue, IssueKind, Severity};
 pub use locator::Locator;
 pub use path::{FlowPlan, MeasureItem, PlanAction, PlanBlock, PlanEnd, PlanStart, ScrollMove};
 pub use target::{

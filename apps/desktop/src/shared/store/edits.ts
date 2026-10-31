@@ -165,10 +165,26 @@ export function remove(doc: ProjectDoc, nodeIds: string[], edgeIndexes: number[]
 
   const positions = { ...doc.layout.nodes };
   for (const id of gone) delete positions[id];
+  const nodes = doc.flow.nodes.filter((n) => !gone.has(n.id)).map((n) => unanchor(n, gone));
   return {
-    flow: { ...doc.flow, nodes: doc.flow.nodes.filter((n) => !gone.has(n.id)), edges },
+    flow: { ...doc.flow, nodes, edges },
     layout: { ...doc.layout, nodes: positions },
   };
+}
+
+/**
+ * Start/End tied to a deleted block would point at nothing (a red shape the
+ * user can't fix from the canvas). Start becomes unanchored again (its next
+ * arrow anchors it, see `connect`); End stays where the last block leaves off.
+ */
+function unanchor(node: FlowNode, gone: Set<string>): FlowNode {
+  if (node.kind === "start" && gone.has(node.at.block)) {
+    return { ...node, at: { ...node.at, block: "" } };
+  }
+  if (node.kind === "end" && node.at && gone.has(node.at.block)) {
+    return { ...node, at: null };
+  }
+  return node;
 }
 
 /** Points the scenario at another site folder or address (`meta.site`). */

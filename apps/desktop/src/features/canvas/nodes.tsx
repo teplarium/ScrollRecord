@@ -13,7 +13,7 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { BlockData, NavigateData, TerminalData } from "./toReactFlow";
+import type { BlockData, NavigateData, ProblemMark, TerminalData } from "./toReactFlow";
 
 const SIDES = [Position.Top, Position.Right, Position.Bottom, Position.Left];
 
@@ -36,6 +36,17 @@ function Handles({ out = true, into = true }: { out?: boolean; into?: boolean })
   );
 }
 
+/** Class of a shape with problems (red or yellow outline, see Canvas.css). */
+function marked(base: string, problem: ProblemMark) {
+  return problem ? `${base} canvas-shape--${problem.severity}` : base;
+}
+
+/** A "!" in the shape's corner; hovering the shape shows the reasons. */
+function ProblemBadge({ problem }: { problem: ProblemMark }) {
+  if (!problem) return null;
+  return <span className={`canvas-badge canvas-badge--${problem.severity}`} aria-hidden="true" />;
+}
+
 /** "1.5 s" / "No stop" — how long the video stays on a shape. */
 function useHoldText() {
   const { t } = useTranslation();
@@ -49,8 +60,12 @@ export const TerminalShape = memo(function TerminalShape({
   const holdText = useHoldText();
   const isStart = data.kind === "start";
   return (
-    <div className={`canvas-terminal canvas-terminal--${data.kind}`}>
+    <div
+      className={marked(`canvas-terminal canvas-terminal--${data.kind}`, data.problem)}
+      title={data.problem?.text}
+    >
       <Handles out={isStart} into={!isStart} />
+      <ProblemBadge problem={data.problem} />
       <span className="canvas-terminal__name">{isStart ? t("canvas.start") : t("canvas.end")}</span>
       {data.holdMs !== null && data.holdMs > 0 && (
         <span className="canvas-terminal__hold">{holdText(data.holdMs)}</span>
@@ -63,8 +78,9 @@ export const BlockShape = memo(function BlockShape({ data }: NodeProps<Node<Bloc
   const { t } = useTranslation();
   const holdText = useHoldText();
   return (
-    <div className="canvas-block">
+    <div className={marked("canvas-block", data.problem)} title={data.problem?.text}>
       <Handles />
+      <ProblemBadge problem={data.problem} />
       <header className="canvas-block__header">
         <span className="canvas-block__name">{data.name}</span>
         <span className="canvas-block__hold">{holdText(data.holdMs)}</span>
@@ -85,8 +101,9 @@ export const NavigateShape = memo(function NavigateShape({
 }: NodeProps<Node<NavigateData, "navigate">>) {
   const { t } = useTranslation();
   return (
-    <div className="canvas-navigate">
+    <div className={marked("canvas-navigate", data.problem)} title={data.problem?.text}>
       <Handles />
+      <ProblemBadge problem={data.problem} />
       <span>
         {data.toPage ? t("canvas.navigateTo", { page: data.toPage }) : t("canvas.navigate")}
       </span>

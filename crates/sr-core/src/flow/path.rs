@@ -17,6 +17,7 @@ use super::{
 };
 use crate::easing::Easing;
 use crate::error::{AppError, AppResult, ErrorCode};
+use crate::flow::issue::{Issue, IssueKind, Severity};
 use crate::flow::{Defaults, FORMAT_VERSION};
 
 /// How to move from the previous position to the next one.
@@ -134,19 +135,40 @@ pub struct FlowPlan {
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
-/// Collects problems; turns into one `SR-2002` error if any.
+/// A target whose device or output size can't be worked out.
+fn bad_target(target: &str, detail: &str) -> Issue {
+    Issue::error(IssueKind::BadTarget, format!("target '{target}': {detail}"))
+        .param("target", target)
+        .param("detail", detail)
+}
+
+/// Collects problems (`Issue`s, see `issue.rs`); turns into one `SR-2002`
+/// error if any of them is an error.
 #[derive(Default)]
 struct Report {
-    errors: Vec<String>,
-    warnings: Vec<String>,
+    issues: Vec<Issue>,
 }
 
 impl Report {
-    fn err(&mut self, msg: impl Into<String>) {
-        self.errors.push(msg.into());
+    fn add(&mut self, issue: Issue) {
+        self.issues.push(issue);
     }
-    fn warn(&mut self, msg: impl Into<String>) {
-        self.warnings.push(msg.into());
+    fn messages(&self, severity: Severity) -> Vec<String> {
+        self.issues
+            .iter()
+            .filter(|i| i.severity == severity)
+            .map(|i| i.message.clone())
+            .collect()
+    }
+    fn has_errors(&self) -> bool {
+        self.issues.iter().any(|i| i.severity == Severity::Error)
+    }
+    /// `SR-2002` listing every error, one per line.
+    fn into_error(self) -> AppError {
+        let errors = self.messages(Severity::Error);
+        AppError::new(ErrorCode::FlowInvalid, errors.join("\n"))
+            .with_param("count", errors.len())
+            .with_param("first", errors.first().cloned().unwrap_or_default())
     }
 }
 
@@ -156,19 +178,31 @@ impl Flow {
     pub fn validate(&self) -> AppResult<Vec<String>> {
         let mut r = Report::default();
         let _path = self.check(&mut r);
-        if r.errors.is_empty() {
-            Ok(r.warnings)
+        if r.has_errors() {
+            Err(r.into_error())
         } else {
-            Err(AppError::new(ErrorCode::FlowInvalid, r.errors.join("\n"))
-                .with_param("count", r.errors.len())
-                .with_param("first", r.errors.first().cloned().unwrap_or_default()))
+            Ok(r.messages(Severity::Warning))
         }
+    }
+
+    /// Every problem of the scenario, errors and warnings, each with the shape
+    /// or arrow it is about (the editor outlines them, FR-CNV-09). Never fails.
+    pub fn issues(&self) -> Vec<Issue> {
+        let mut r = Report::default();
+        let _path = self.check(&mut r);
+        r.issues
     }
 
     /// Runs all checks; returns the ordered node path if the graph is sound.
     fn check(&self, r: &mut Report) -> Option<Vec<&Node>> {
         if self.format_version != FORMAT_VERSION {
-            r.err(format!("format_version must be {FORMAT_VERSION}"));
+            r.add(
+                Issue::error(
+                    IssueKind::FormatVersion,
+                    format!("format_version must be {FORMAT_VERSION}"),
+                )
+                .param("version", FORMAT_VERSION),
+            );
         }
         self.check_targets(r);
         let pages = self.check_pages(r);
@@ -181,47 +215,78 @@ impl Flow {
 
     fn check_targets(&self, r: &mut Report) {
         if self.targets.is_empty() {
-            r.err("targets: at least one render target is required");
+            r.add(Issue::error(
+                IssueKind::NoTargets,
+                "targets: at least one render target is required",
+            ));
         }
         let mut seen = HashSet::new();
         for t in &self.targets {
             if !seen.insert(t.id.as_str()) {
-                r.err(format!("targets: duplicate id '{}'", t.id));
+                r.add(
+                    Issue::error(
+                        IssueKind::DuplicateTarget,
+                        format!("targets: duplicate id '{}'", t.id),
+                    )
+                    .param("target", &t.id),
+                );
             }
             if !(1..=120).contains(&t.fps) {
-                r.err(format!(
-                    "target '{}': fps must be 1..120, got {}",
-                    t.id, t.fps
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::BadFps,
+                        format!("target '{}': fps must be 1..120, got {}", t.id, t.fps),
+                    )
+                    .param("target", &t.id)
+                    .param("fps", t.fps),
+                );
             }
             match t.viewport.resolve() {
                 Ok(vp) => {
                     if let Err(e) = t.geometry(&vp) {
-                        r.err(format!("target '{}': {e}", t.id));
+                        r.add(bad_target(&t.id, &e));
                     }
                 }
-                Err(e) => r.err(format!("target '{}': {e}", t.id)),
+                Err(e) => r.add(bad_target(&t.id, &e)),
             }
             if t.frame == Frame::Block && t.frame_block.is_none() {
-                r.err(format!(
-                    "target '{}': frame 'block' needs frame_block",
-                    t.id
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::FrameBlockMissing,
+                        format!("target '{}': frame 'block' needs frame_block", t.id),
+                    )
+                    .param("target", &t.id),
+                );
             }
         }
     }
 
     fn check_pages(&self, r: &mut Report) -> HashSet<&str> {
         if self.pages.is_empty() {
-            r.err("pages: at least one page is required");
+            r.add(Issue::error(
+                IssueKind::NoPages,
+                "pages: at least one page is required",
+            ));
         }
         let mut ids = HashSet::new();
         for p in &self.pages {
             if !ids.insert(p.id.as_str()) {
-                r.err(format!("pages: duplicate id '{}'", p.id));
+                r.add(
+                    Issue::error(
+                        IssueKind::DuplicatePage,
+                        format!("pages: duplicate id '{}'", p.id),
+                    )
+                    .param("page", &p.id),
+                );
             }
             if p.url.trim().is_empty() {
-                r.err(format!("page '{}': url is empty", p.id));
+                r.add(
+                    Issue::error(
+                        IssueKind::EmptyUrl,
+                        format!("page '{}': url is empty", p.id),
+                    )
+                    .param("page", &p.id),
+                );
             }
         }
         ids
@@ -235,26 +300,53 @@ impl Flow {
         let mut nodes = HashMap::new();
         for n in &self.nodes {
             if n.id().trim().is_empty() {
-                r.err("nodes: a node has an empty id");
+                r.add(Issue::error(
+                    IssueKind::EmptyNodeId,
+                    "nodes: a node has an empty id",
+                ));
             }
             if nodes.insert(n.id(), n).is_some() {
-                r.err(format!("nodes: duplicate id '{}'", n.id()));
+                r.add(
+                    Issue::error(
+                        IssueKind::DuplicateNode,
+                        format!("nodes: duplicate id '{}'", n.id()),
+                    )
+                    .node(n.id())
+                    .param("node", n.id()),
+                );
             }
         }
         let is_block = |id: &str| matches!(nodes.get(id), Some(Node::Block(_)));
         let check_anchor = |r: &mut Report, owner: &str, a: &Anchor| {
             if !is_block(&a.block) {
-                r.err(format!(
-                    "node '{owner}': anchor block '{}' is not a block node",
-                    a.block
-                ));
+                let kind = if a.block.trim().is_empty() {
+                    IssueKind::AnchorMissing
+                } else {
+                    IssueKind::AnchorNotBlock
+                };
+                r.add(
+                    Issue::error(
+                        kind,
+                        format!(
+                            "node '{owner}': anchor block '{}' is not a block node",
+                            a.block
+                        ),
+                    )
+                    .node(owner)
+                    .param("block", &a.block),
+                );
             }
             if let Some(p) = a.progress
                 && !(0.0..=1.0).contains(&p)
             {
-                r.err(format!(
-                    "node '{owner}': anchor progress must be 0..1, got {p}"
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::AnchorProgress,
+                        format!("node '{owner}': anchor progress must be 0..1, got {p}"),
+                    )
+                    .node(owner)
+                    .param("value", p),
+                );
             }
         };
         for n in &self.nodes {
@@ -267,31 +359,60 @@ impl Flow {
                 }
                 Node::Block(b) => {
                     if !pages.contains(b.page.as_str()) {
-                        r.err(format!("block '{}': unknown page '{}'", b.id, b.page));
+                        r.add(
+                            Issue::error(
+                                IssueKind::UnknownPage,
+                                format!("block '{}': unknown page '{}'", b.id, b.page),
+                            )
+                            .node(&b.id)
+                            .param("page", &b.page),
+                        );
                     }
                     if b.target.is_empty() {
-                        r.err(format!(
-                            "block '{}': target needs at least one locator",
-                            b.id
-                        ));
+                        r.add(
+                            Issue::error(
+                                IssueKind::NoLocator,
+                                format!("block '{}': target needs at least one locator", b.id),
+                            )
+                            .node(&b.id),
+                        );
                     }
                     for (i, loc) in b.target.iter().enumerate() {
                         if let Err(e) = loc.check() {
-                            r.err(format!("block '{}': target[{i}]: {e}", b.id));
+                            r.add(
+                                Issue::error(
+                                    IssueKind::BadLocator,
+                                    format!("block '{}': target[{i}]: {e}", b.id),
+                                )
+                                .node(&b.id)
+                                .param("index", i + 1)
+                                .param("detail", &e),
+                            );
                         }
                     }
                 }
                 Node::Navigate(nav) => {
                     if !pages.contains(nav.page.as_str()) {
-                        r.err(format!(
-                            "navigate '{}': unknown page '{}'",
-                            nav.id, nav.page
-                        ));
+                        r.add(
+                            Issue::error(
+                                IssueKind::NavigateUnknownPage,
+                                format!("navigate '{}': unknown page '{}'", nav.id, nav.page),
+                            )
+                            .node(&nav.id)
+                            .param("page", &nav.page),
+                        );
                     }
                     if let Some(to) = &nav.to_page
                         && !pages.contains(to.as_str())
                     {
-                        r.err(format!("navigate '{}': unknown to_page '{to}'", nav.id));
+                        r.add(
+                            Issue::error(
+                                IssueKind::NavigateUnknownPage,
+                                format!("navigate '{}': unknown to_page '{to}'", nav.id),
+                            )
+                            .node(&nav.id)
+                            .param("page", to),
+                        );
                     }
                 }
             }
@@ -300,10 +421,14 @@ impl Flow {
             if let Some(fb) = &t.frame_block
                 && !is_block(fb)
             {
-                r.err(format!(
-                    "target '{}': frame_block '{fb}' is not a block node",
-                    t.id
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::FrameBlockNotBlock,
+                        format!("target '{}': frame_block '{fb}' is not a block node", t.id),
+                    )
+                    .param("target", &t.id)
+                    .param("block", fb),
+                );
             }
         }
         let starts = self
@@ -317,14 +442,22 @@ impl Flow {
             .filter(|n| matches!(n, Node::End(_)))
             .count();
         if starts != 1 {
-            r.err(format!(
-                "nodes: exactly one start node is required, found {starts}"
-            ));
+            r.add(
+                Issue::error(
+                    IssueKind::StartCount,
+                    format!("nodes: exactly one start node is required, found {starts}"),
+                )
+                .param("count", starts),
+            );
         }
         if ends != 1 {
-            r.err(format!(
-                "nodes: exactly one end node is required, found {ends}"
-            ));
+            r.add(
+                Issue::error(
+                    IssueKind::EndCount,
+                    format!("nodes: exactly one end node is required, found {ends}"),
+                )
+                .param("count", ends),
+            );
         }
         nodes
     }
@@ -338,61 +471,98 @@ impl Flow {
     ) -> Option<Vec<&'a Node>> {
         let mut out: HashMap<&str, &str> = HashMap::new();
         let mut incoming: HashMap<&str, usize> = HashMap::new();
-        for e in &self.edges {
+        for (i, e) in self.edges.iter().enumerate() {
             let mut ok = true;
             for end in [&e.from, &e.to] {
                 if !nodes.contains_key(end.as_str()) {
-                    r.err(format!("arrow {} → {}: unknown node '{end}'", e.from, e.to));
+                    r.add(
+                        Issue::error(
+                            IssueKind::ArrowUnknownNode,
+                            format!("arrow {} → {}: unknown node '{end}'", e.from, e.to),
+                        )
+                        .edge(i)
+                        .param("node", end),
+                    );
                     ok = false;
                 }
             }
             if e.from == e.to {
-                r.err(format!(
-                    "arrow {0} → {0}: a node cannot point to itself",
-                    e.from
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::ArrowToItself,
+                        format!("arrow {0} → {0}: a node cannot point to itself", e.from),
+                    )
+                    .edge(i)
+                    .node(&e.from),
+                );
                 ok = false;
             }
             if !ok {
                 continue;
             }
             if out.insert(&e.from, &e.to).is_some() {
-                r.err(format!(
-                    "node '{}' has more than one outgoing arrow (branches are not supported yet)",
-                    e.from
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::Branch,
+                        format!(
+                            "node '{}' has more than one outgoing arrow (branches are not supported yet)",
+                            e.from
+                        ),
+                    )
+                    .node(&e.from)
+                    .edge(i),
+                );
             }
             *incoming.entry(&e.to).or_default() += 1;
             if let Some(spec) = e.scroll.speed_px_s
                 && spec <= 0.0
             {
-                r.err(format!(
-                    "arrow {} → {}: speed_px_s must be positive",
-                    e.from, e.to
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::BadSpeed,
+                        format!("arrow {} → {}: speed_px_s must be positive", e.from, e.to),
+                    )
+                    .edge(i),
+                );
             }
         }
         for (id, count) in &incoming {
             if *count > 1 {
-                r.err(format!(
-                    "node '{id}' has {count} incoming arrows; one path needs exactly one"
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::ManyIncoming,
+                        format!(
+                            "node '{id}' has {count} incoming arrows; one path needs exactly one"
+                        ),
+                    )
+                    .node(*id)
+                    .param("count", count),
+                );
             }
         }
 
         let start = self.nodes.iter().find(|n| matches!(n, Node::Start(_)))?;
         if incoming.contains_key(start.id()) {
-            r.err(format!(
-                "start '{}' must not have incoming arrows",
-                start.id()
-            ));
+            r.add(
+                Issue::error(
+                    IssueKind::StartHasIncoming,
+                    format!("start '{}' must not have incoming arrows", start.id()),
+                )
+                .node(start.id()),
+            );
         }
         let mut path = vec![start];
         let mut visited: HashSet<&str> = HashSet::from([start.id()]);
         let mut current = start.id();
         while let Some(next) = out.get(current) {
             if !visited.insert(next) {
-                r.err(format!("arrows form a loop at node '{next}'"));
+                r.add(
+                    Issue::error(
+                        IssueKind::Loop,
+                        format!("arrows form a loop at node '{next}'"),
+                    )
+                    .node(*next),
+                );
                 return None;
             }
             let node = nodes.get(next)?;
@@ -402,10 +572,16 @@ impl Flow {
         match path.last() {
             Some(Node::End(_)) => {}
             Some(last) => {
-                r.err(format!(
-                    "the path from start stops at '{}' without reaching the end node",
-                    last.id()
-                ));
+                r.add(
+                    Issue::error(
+                        IssueKind::PathNotToEnd,
+                        format!(
+                            "the path from start stops at '{}' without reaching the end node",
+                            last.id()
+                        ),
+                    )
+                    .node(last.id()),
+                );
             }
             None => {}
         }
@@ -427,17 +603,16 @@ impl Flow {
         referenced.extend(self.targets.iter().filter_map(|t| t.frame_block.as_deref()));
         for n in &self.nodes {
             if !visited.contains(n.id()) && !referenced.contains(n.id()) {
-                r.warn(format!(
-                    "node '{}' is not on the path and will be ignored",
-                    n.id()
-                ));
+                r.add(
+                    Issue::warning(
+                        IssueKind::NotOnPath,
+                        format!("node '{}' is not on the path and will be ignored", n.id()),
+                    )
+                    .node(n.id()),
+                );
             }
         }
-        if r.errors.is_empty() {
-            Some(path)
-        } else {
-            None
-        }
+        if r.has_errors() { None } else { Some(path) }
     }
 
     fn check_overrides(&self, r: &mut Report, nodes: &HashMap<&str, &Node>) {
@@ -447,13 +622,26 @@ impl Flow {
                 .iter()
                 .any(|t| t.id == *key || t.viewport.preset_name() == Some(key.as_str()));
             if !matches {
-                r.warn(format!(
-                    "overrides '{key}': no target or used viewport preset has this name"
-                ));
+                r.add(
+                    Issue::warning(
+                        IssueKind::OverrideUnused,
+                        format!(
+                            "overrides '{key}': no target or used viewport preset has this name"
+                        ),
+                    )
+                    .param("key", key),
+                );
             }
             for id in ov.nodes.keys() {
                 if !nodes.contains_key(id.as_str()) {
-                    r.err(format!("overrides '{key}': unknown node '{id}'"));
+                    r.add(
+                        Issue::error(
+                            IssueKind::OverrideUnknownNode,
+                            format!("overrides '{key}': unknown node '{id}'"),
+                        )
+                        .param("key", key)
+                        .param("node", id),
+                    );
                 }
             }
         }
@@ -461,17 +649,22 @@ impl Flow {
 
     fn check_cursor_and_actions(&self, r: &mut Report) {
         if let Err(e) = self.defaults.cursor.check() {
-            r.err(format!("defaults: {e}"));
+            r.add(Issue::error(IssueKind::BadCursor, format!("defaults: {e}")).param("detail", &e));
         }
         for n in &self.nodes {
             if let Node::Block(b) = n {
                 for (i, a) in b.actions.iter().enumerate() {
                     if let Err(e) = a.check() {
-                        r.err(format!(
-                            "block '{}': actions[{i}] ({}): {e}",
-                            b.id,
-                            a.kind_name()
-                        ));
+                        r.add(
+                            Issue::error(
+                                IssueKind::BadAction,
+                                format!("block '{}': actions[{i}] ({}): {e}", b.id, a.kind_name()),
+                            )
+                            .node(&b.id)
+                            .param("index", i + 1)
+                            .param("action", a.kind_name())
+                            .param("detail", &e),
+                        );
                     }
                 }
             }
@@ -479,9 +672,16 @@ impl Flow {
         for (key, ov) in &self.overrides {
             for (id, n) in &ov.nodes {
                 if !n.before.is_empty() {
-                    r.warn(format!(
-                        "overrides '{key}' / '{id}': 'before' actions arrive with navigation (Phase 4) and are ignored for now"
-                    ));
+                    r.add(
+                        Issue::warning(
+                            IssueKind::BeforeIgnored,
+                            format!(
+                                "overrides '{key}' / '{id}': 'before' actions arrive with navigation (Phase 4) and are ignored for now"
+                            ),
+                        )
+                        .node(id)
+                        .param("key", key),
+                    );
                 }
             }
         }
@@ -493,10 +693,8 @@ impl Flow {
     pub fn plan(&self, target_id: &str) -> AppResult<FlowPlan> {
         let mut r = Report::default();
         let path = self.check(&mut r);
-        if !r.errors.is_empty() {
-            return Err(AppError::new(ErrorCode::FlowInvalid, r.errors.join("\n"))
-                .with_param("count", r.errors.len())
-                .with_param("first", r.errors.first().cloned().unwrap_or_default()));
+        if r.has_errors() {
+            return Err(r.into_error());
         }
         let path =
             path.ok_or_else(|| AppError::new(ErrorCode::Internal, "valid flow without path"))?;
@@ -518,7 +716,7 @@ impl Flow {
         let overrides = self.overrides_for(&target);
         let touch = viewport.has_touch();
         let preset = target.viewport.preset_name();
-        let mut warnings = r.warnings;
+        let mut warnings = r.messages(Severity::Warning);
         let cursor_into = |id: &str| -> ScrollCursor {
             self.edges
                 .iter()
@@ -853,5 +1051,125 @@ mod tests {
         let err = flow(&nav).plan("desktop").unwrap_err();
         assert_eq!(err.code, ErrorCode::NotImplemented);
         assert_eq!(err.params["phase"], "4");
+    }
+
+    // ── Issues for the editor (FR-CNV-09): each one points at its shape/arrow ──
+
+    fn edited(edit: impl FnOnce(&mut serde_json::Value)) -> Flow {
+        let mut value: serde_json::Value = serde_json::from_str(BASE).unwrap();
+        edit(&mut value);
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn found(flow: &Flow) -> Vec<(IssueKind, Severity, Option<String>, Option<usize>)> {
+        flow.issues()
+            .into_iter()
+            .map(|i| (i.kind, i.severity, i.node, i.edge))
+            .collect()
+    }
+
+    #[test]
+    fn a_sound_scenario_has_no_issues() {
+        assert!(flow(BASE).issues().is_empty());
+    }
+
+    #[test]
+    fn a_broken_path_points_at_the_last_shape_and_the_ignored_one() {
+        // Remove the arrow a → b: the path stops at a, b is left alone.
+        let f = edited(|v| {
+            v["edges"].as_array_mut().unwrap().remove(2);
+        });
+        let issues = found(&f);
+        assert!(issues.contains(&(
+            IssueKind::PathNotToEnd,
+            Severity::Error,
+            Some("a".into()),
+            None
+        )));
+        assert!(issues.contains(&(
+            IssueKind::NotOnPath,
+            Severity::Warning,
+            Some("b".into()),
+            None
+        )));
+        // The CLI text is built from the same issues.
+        let err = f.validate().unwrap_err();
+        assert!(err.message.contains("stops at 'a'"));
+    }
+
+    #[test]
+    fn branches_and_unknown_ends_point_at_their_arrows() {
+        let f = edited(|v| {
+            let edges = v["edges"].as_array_mut().unwrap();
+            edges.push(serde_json::json!({ "from": "a", "to": "end" }));
+            edges.push(serde_json::json!({ "from": "b", "to": "ghost" }));
+        });
+        let issues = found(&f);
+        assert!(issues.contains(&(
+            IssueKind::Branch,
+            Severity::Error,
+            Some("a".into()),
+            Some(3)
+        )));
+        assert!(issues.contains(&(
+            IssueKind::ManyIncoming,
+            Severity::Error,
+            Some("end".into()),
+            None
+        )));
+        assert!(issues.contains(&(IssueKind::ArrowUnknownNode, Severity::Error, None, Some(4))));
+    }
+
+    #[test]
+    fn shape_problems_carry_the_shape_and_text_values() {
+        let f = edited(|v| {
+            v["nodes"][3]["page"] = "nowhere".into();
+            v["nodes"][2]["at"]["block"] = "deleted".into();
+        });
+        let issues = f.issues();
+        let page = issues
+            .iter()
+            .find(|i| i.kind == IssueKind::UnknownPage)
+            .unwrap();
+        assert_eq!(page.node.as_deref(), Some("a"));
+        assert_eq!(page.params.get("page").map(String::as_str), Some("nowhere"));
+        let anchor = issues
+            .iter()
+            .find(|i| i.kind == IssueKind::AnchorNotBlock)
+            .unwrap();
+        assert_eq!(anchor.node.as_deref(), Some("start"));
+        assert_eq!(
+            anchor.params.get("block").map(String::as_str),
+            Some("deleted")
+        );
+    }
+
+    #[test]
+    fn a_start_not_anchored_yet_is_its_own_kind_with_the_same_cli_text() {
+        // The editor creates Start with an empty anchor (the first arrow sets
+        // it); the editor shows that only before rendering, unlike a broken anchor.
+        let f = edited(|v| v["nodes"][2]["at"]["block"] = "".into());
+        let issues = f.issues();
+        let anchor = issues
+            .iter()
+            .find(|i| i.node.as_deref() == Some("start"))
+            .unwrap();
+        assert_eq!(anchor.kind, IssueKind::AnchorMissing);
+        assert!(
+            anchor
+                .message
+                .contains("anchor block '' is not a block node")
+        );
+    }
+
+    #[test]
+    fn an_empty_new_project_asks_for_start_and_end() {
+        let f = edited(|v| {
+            v["nodes"] = serde_json::json!([]);
+            v["edges"] = serde_json::json!([]);
+            v["overrides"] = serde_json::json!({});
+        });
+        let kinds: Vec<IssueKind> = f.issues().into_iter().map(|i| i.kind).collect();
+        assert_eq!(kinds, [IssueKind::StartCount, IssueKind::EndCount]);
     }
 }

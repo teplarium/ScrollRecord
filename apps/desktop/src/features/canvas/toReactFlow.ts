@@ -9,6 +9,8 @@
  * this device are shown pushed apart (`separate.ts`, never saved).
  * Each arrow leaves and enters on the sides that face each other, so a column
  * reads top to bottom and a branch to the right reads left to right.
+ * Problems of the scenario (`ShapeProblem`, from Rust's checks and the site
+ * map) mark their shapes and arrows (FR-CNV-09).
  */
 import { MarkerType, Position, type Edge, type Node } from "@xyflow/react";
 
@@ -19,25 +21,43 @@ import { shapeSize, type Size } from "./cardSize";
 import type { CanvasLayout } from "../../shared/store/layout";
 import { separate } from "./separate";
 
-export type TerminalData = { kind: "start" | "end"; holdMs: number | null };
-export type BlockData = { name: string; holdMs: number; actions: number };
-export type NavigateData = { toPage: string | null };
+/** A problem to show on the canvas, already in the user's language. */
+export type ShapeProblem = {
+  severity: "error" | "warning";
+  text: string;
+  /** The shape it is about, or the arrow (index in `flow.edges`), or neither. */
+  node: string | null;
+  edge: number | null;
+};
+
+/** What a shape shows of its problems: the worst severity and every text. */
+export type ProblemMark = { severity: "error" | "warning"; text: string } | null;
+
+type Marked = { problem: ProblemMark };
+export type TerminalData = Marked & { kind: "start" | "end"; holdMs: number | null };
+export type BlockData = Marked & { name: string; holdMs: number; actions: number };
+export type NavigateData = Marked & { toPage: string | null };
 
 export type CanvasNode =
   Node<TerminalData, "terminal"> | Node<BlockData, "block"> | Node<NavigateData, "navigate">;
 
 export type CanvasGraph = { nodes: CanvasNode[]; edges: Edge[] };
 
-function nodeData(node: FlowNode, flow: Flow): Pick<CanvasNode, "type" | "data"> {
+function nodeData(
+  node: FlowNode,
+  flow: Flow,
+  problem: ProblemMark,
+): Pick<CanvasNode, "type" | "data"> {
   switch (node.kind) {
     case "start":
-      return { type: "terminal", data: { kind: "start", holdMs: null } };
+      return { type: "terminal", data: { problem, kind: "start", holdMs: null } };
     case "end":
-      return { type: "terminal", data: { kind: "end", holdMs: node.hold_ms } };
+      return { type: "terminal", data: { problem, kind: "end", holdMs: node.hold_ms } };
     case "block":
       return {
         type: "block",
         data: {
+          problem,
           name: node.id,
           // `null` = the scenario default (Rust applies the same rule).
           holdMs: node.hold_ms ?? flow.defaults.hold_ms,
@@ -45,13 +65,35 @@ function nodeData(node: FlowNode, flow: Flow): Pick<CanvasNode, "type" | "data">
         },
       };
     case "navigate":
-      return { type: "navigate", data: { toPage: node.to_page ?? null } };
+      return { type: "navigate", data: { problem, toPage: node.to_page ?? null } };
   }
 }
 
+/** The marks of the shapes (by id) or arrows (by index) that have problems. */
+export function problemMarks<K>(problems: ShapeProblem[], keyOf: (p: ShapeProblem) => K | null) {
+  const marks = new Map<K, NonNullable<ProblemMark>>();
+  for (const p of problems) {
+    const key = keyOf(p);
+    if (key === null) continue;
+    const old = marks.get(key);
+    marks.set(key, {
+      severity: old?.severity === "error" || p.severity === "error" ? "error" : "warning",
+      text: old ? `${old.text}\n${p.text}` : p.text,
+    });
+  }
+  return marks;
+}
+
 /** Builds the canvas for one device; `card` is that device's block card size. */
-export function buildCanvas(flow: Flow, layout: CanvasLayout, card: Size): CanvasGraph {
+export function buildCanvas(
+  flow: Flow,
+  layout: CanvasLayout,
+  card: Size,
+  problems: ShapeProblem[] = [],
+): CanvasGraph {
   const sizeOf = (node: FlowNode) => shapeSize(node, card);
+  const nodeMarks = problemMarks(problems, (p) => p.node);
+  const edgeMarks = problemMarks(problems, (p) => p.edge);
   const auto = autoLayout(flow.nodes, flow.edges, sizeOf);
 
   const placed = flow.nodes.map((node): CanvasNode => {
@@ -61,7 +103,7 @@ export function buildCanvas(flow: Flow, layout: CanvasLayout, card: Size): Canva
       position: layout.nodes[node.id] ?? auto[node.id] ?? { x: 0, y: 0 },
       width,
       height,
-      ...nodeData(node, flow),
+      ...nodeData(node, flow, nodeMarks.get(node.id) ?? null),
     } as CanvasNode;
   });
   const pushed = separate(
@@ -88,6 +130,7 @@ export function buildCanvas(flow: Flow, layout: CanvasLayout, card: Size): Canva
       sourceHandle: out,
       targetHandle: `${into}-in`,
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
+      ...(edgeMarks.has(i) ? { className: `canvas-edge--${edgeMarks.get(i)?.severity}` } : {}),
     });
   });
 

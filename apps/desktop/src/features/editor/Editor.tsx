@@ -32,6 +32,7 @@ import { Canvas } from "../canvas/Canvas";
 import { screenOf } from "../canvas/cardSize";
 import { SiteMap } from "../site-map/SiteMap";
 import { useSiteMap } from "../site-map/useSiteMap";
+import { toProblems, useIssues } from "./problems";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { editorShortcut } from "./shortcuts";
 import { TopActions } from "./TopActions";
@@ -91,6 +92,16 @@ export function Editor({ project }: Props) {
   // The site map of the shown device; not read while the site folder is missing.
   const siteMap = useSiteMap(project.dir, flow, siteMissing ? null : (target?.id ?? null));
 
+  // ── Problems marked on the canvas (FR-CNV-09) ──
+  // The site map counts only when it is the shown device's and up to date.
+  const issues = useIssues(flow);
+  const { map, stale } = siteMap.state;
+  const shownMap = map && !stale && map.target === target?.id ? map : null;
+  const problems = useMemo(
+    () => toProblems(issues, shownMap, flow, t),
+    [issues, shownMap, flow, t],
+  );
+
   async function locateSite() {
     const picked = await pickSiteFolder(t("siteMap.locateTitle"), {
       files: t("dialogs.webPages"),
@@ -123,7 +134,7 @@ export function Editor({ project }: Props) {
             )}
           </div>
         )}
-        <Canvas store={store} screen={screen} />
+        <Canvas store={store} screen={screen} problems={problems} />
         <span className={`editor__save editor__save--${save.status}`} role="status">
           {t(`save.${save.status}`)}
         </span>

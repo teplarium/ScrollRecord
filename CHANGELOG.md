@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 
 ## [Unreleased]
 
+### Editor, step 3.4b — problems are shown on the canvas
+- The scenario is checked as you edit (a moment after each change). A shape with a problem gets a red outline and a "!" (a yellow dashed one for things that are only ignored); hover it to read why — for example "This block is on page "faq", which the scenario doesn't have".
+- An unfinished path is not a problem while you build: no End yet, Start not connected, a block not on the path, the path stopping halfway — none of this is marked on the canvas. It will be shown when you start a render (render step 3.7).
+- Deleting a block that Start or End was tied to now unties them, instead of leaving a red Start or End that couldn't be fixed. (An End that already points at a deleted block: delete End and drag it in again.)
+- A broken arrow turns red.
+- A button in the top-left corner of the canvas says how many problems there are ("2 problems · 1 note"); it opens the list, and clicking a row shows its shape. Problems that belong to no shape ("The scenario needs exactly one End") are listed there too.
+- Blocks the site doesn't have on the chosen device are marked as well ("This block wasn't found on the site for this device").
+- The command-line check (`scrollrecord validate`) prints the same texts as before.
+
 ### Editor, step 3.4a — building the scenario with the mouse
 - The canvas is controlled like Figma: the pointer selects. Click a shape, or drag on an empty spot to select every shape the box touches; Shift or Ctrl+click adds shapes to the selection; dragging a selected shape moves the whole group (one Ctrl+Z puts it back). The wheel scrolls up and down, Shift+wheel left and right, Ctrl+wheel (or a touchpad pinch) zooms towards the cursor. To move the view by dragging, hold Space or use the middle mouse button.
 - Put Start, End and blocks on the canvas from the site map: drag a row to the place you want, or click it — it appears in a free spot in the middle of the view. Clicking a row that is already on the canvas (red dot) shows it there; drag a block again to use it a second time.
