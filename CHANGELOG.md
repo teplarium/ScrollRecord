@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions follo
 ## [Unreleased]
 
 ### Editor, step 3.4a — building the scenario with the mouse
+- The canvas is controlled like Figma: the pointer selects. Click a shape, or drag on an empty spot to select every shape the box touches; Shift or Ctrl+click adds shapes to the selection; dragging a selected shape moves the whole group (one Ctrl+Z puts it back). The wheel scrolls up and down, Shift+wheel left and right, Ctrl+wheel (or a touchpad pinch) zooms towards the cursor. To move the view by dragging, hold Space or use the middle mouse button.
 - Put Start, End and blocks on the canvas from the site map: drag a row to the place you want, or click it — it appears in a free spot in the middle of the view. Clicking a row that is already on the canvas (red dot) shows it there; drag a block again to use it a second time.
 - Pull an arrow out of a shape: hover it, grab one of the round handles on its sides and drop it on another shape (anywhere on it). A shape has one arrow out and one in, so a new arrow replaces the old one. The first arrow from Start to a block also tells Start where the video begins.
 - Move shapes by dragging; Delete (or Backspace) removes the selected shapes or arrows.

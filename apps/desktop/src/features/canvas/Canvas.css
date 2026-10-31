@@ -26,6 +26,9 @@
   --xy-controls-button-color-hover: var(--text);
   --xy-controls-button-border-color: var(--border);
   --xy-attribution-background-color: transparent;
+  /* Box selection (drag on the empty canvas). */
+  --xy-selection-background-color: rgb(124 183 255 / 12%);
+  --xy-selection-border: 1px solid var(--focus);
 }
 
 .canvas .react-flow__minimap,

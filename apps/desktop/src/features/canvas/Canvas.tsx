@@ -7,9 +7,13 @@
  * dropped (FR-CNV-07). Every change goes to the tab's project store as one
  * undo step (`shared/store`); the canvas never changes the scenario itself.
  *
- * Navigation like FigJam: the wheel / touchpad pans, Ctrl+wheel or a pinch
- * zooms, dragging the empty canvas pans. Only shapes in view are drawn, so
- * long scenarios stay smooth (NFR-05).
+ * Controls like Figma (owner, after the 3.4a check): the pointer selects —
+ * click a shape, drag on the empty canvas to box-select (touching is enough),
+ * Shift/Ctrl+click adds to the selection, dragging a selected shape moves the
+ * whole selection. The wheel scrolls up/down, Shift+wheel left/right,
+ * Ctrl+wheel (or a pinch) zooms towards the cursor; Space+drag or the middle
+ * button pans. Only shapes in view are drawn, so long scenarios stay smooth
+ * (NFR-05).
  */
 import "@xyflow/react/dist/style.css";
 import "./Canvas.css";
@@ -18,6 +22,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
   Background,
+  SelectionMode,
   BackgroundVariant,
   Controls,
   MiniMap,
@@ -285,7 +290,10 @@ function CanvasView({ store, screen }: Props) {
         defaultEdgeOptions={EDGE_OPTIONS}
         connectionRadius={40}
         panOnScroll
-        panOnDrag
+        panOnDrag={PAN_BUTTONS}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        multiSelectionKeyCode={MULTI_SELECT_KEYS}
         zoomOnDoubleClick={false}
         minZoom={0.02}
         maxZoom={2}
@@ -306,6 +314,10 @@ function CanvasView({ store, screen }: Props) {
 }
 
 const DELETE_KEYS = ["Delete", "Backspace"];
+// Dragging pans only with the middle button (or with Space held, React Flow's
+// default); the left button selects.
+const PAN_BUTTONS = [1];
+const MULTI_SELECT_KEYS = ["Shift", "Control", "Meta"];
 // A wide invisible stroke makes thin arrows easy to click when zoomed out.
 const EDGE_OPTIONS = { interactionWidth: 40 };
 
